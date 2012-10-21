@@ -18,25 +18,89 @@
 <script id="exoplanet-shader-fs" type="x-shader/x-fragment">
     precision mediump float;
 
-    varying vec2 vTextureCoord;
-    varying vec3 vLightWeighting;
+    // Use texture
+    uniform int texture;
+    uniform sampler2D textureSampler;
+
+    // These are the input params per fragment,
+    // interpolated by webGL
+    varying vec3 eyePosition;
+    varying vec3 normal;
+    varying vec2 textureCoord; // texture coords
 
     void main(void) {
-        gl_FragColor = vec4(1,1,1,1);
+        // light source (hardcoded for now)
+        vec3 lightSourcePosition = vec3(0., 0., 0.);
+        vec3 lightColor = vec3(1., 1., 1.);
+
+        // Normalized normal
+        vec3 N = normalize(normal);
+
+        // point light from (0,0,0), which is where the camera is always
+        vec3 L = normalize(lightSourcePosition - eyePosition);
+        vec3 V = normalize(-eyePosition);
+        vec3 R = normalize(reflect(-L, N));
+
+        // TODO: pass in instead of hard-coding
+        // diffuse, ambient, and specular materials
+        vec3 Kd, Ks, Ka;
+        if(texture==1) {
+            vec4 textureColor = texture2D(textureSampler, vec2(textureCoord.s, textureCoord.t));
+            Kd = textureColor.rgb;
+        } else {
+            Kd = vec3(0.8, 0.5, 0.5);
+        }
+        Ks = vec3(1, 1, 1);
+        Ka = vec3(0.2, 0.2, 0.2);
+
+        // compute the diffuse color coefficient
+        float Rd = max(0., dot(L, N));
+
+        vec3 diffuse = Rd * Kd * lightColor;
+        vec3 ambient = Ka * lightColor;
+        vec3 specular = pow(max(0.,dot(R,V)), 2.) * vec3(0.2,0.2,0.2);
+
+        // Tell webgl what the fragment color is
+        gl_FragColor = vec4(diffuse + ambient + specular, 1.);
     }
 </script>
 
 <script id="exoplanet-shader-vs" type="x-shader/x-vertex">
-    attribute vec3 aVertexPosition;
-    attribute vec3 aVertexNormal;
-    attribute vec2 aTextureCoord;
+    // These are the input params per vertex,
+    // specified when we bind vertex positions, normals, and
+    // text coords as attributes
+    attribute vec3 vertexPosition;
+    attribute vec3 vertexNormal;
+    attribute vec2 vertexTextureCoord;
 
+    // The modelview, projection, and normal matrix passed in
     uniform mat4 uMVMatrix;
     uniform mat4 uPMatrix;
     uniform mat3 uNMatrix;
 
+    // These are the output values for the shader, to be
+    // interpolated across vertices and passed in per fragment
+    // to the fragment shader
+    varying vec3 eyePosition; // pos of vertex in eye (camera) space
+    varying vec3 normal; // normal at vertex
+    varying vec2 textureCoord;
+
     void main(void) {
-        gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+        // Transform vertex to get eye-space position of vertex
+        vec4 eyePositionHomo = uMVMatrix*vec4(vertexPosition, 1); // homogenous
+        eyePosition = eyePositionHomo.xyz;
+
+        // Transform normal appropriately and save
+        normal = uNMatrix*vertexNormal;
+
+        // Just copy texture coords
+        textureCoord = vertexTextureCoord;
+        
+        // Transform again to get clip-space coordinates via the
+        // projection matrix. The gl_Position variable tells webGL
+        // where the vertex should go
+        gl_Position = uPMatrix * uMVMatrix * vec4(vertexPosition, 1.0);
+
     }
 </script>
 
@@ -44,30 +108,30 @@
 <script id="solar-shader-fs" type="x-shader/x-fragment">
     precision mediump float;
 
-    varying vec2 vTextureCoord;
+    varying vec2 textureCoord;
 
     uniform sampler2D uSampler;
 
     void main(void) {
-        vec4 textureColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
+        vec4 textureColor = texture2D(uSampler, vec2(textureCoord.s, textureCoord.t));
         gl_FragColor = vec4(textureColor.rgb, textureColor.a);
     }
 </script>
 
 <script id="solar-shader-vs" type="x-shader/x-vertex">
-    attribute vec3 aVertexPosition;
-    attribute vec3 aVertexNormal;
-    attribute vec2 aTextureCoord;
+    attribute vec3 vertexPosition;
+    attribute vec3 vertexNormal;
+    attribute vec2 vertexTextureCoord;
 
     uniform mat4 uMVMatrix;
     uniform mat4 uPMatrix;
     uniform mat3 uNMatrix;
 
-    varying vec2 vTextureCoord;
+    varying vec2 textureCoord;
 
     void main(void) {
-        gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
-        vTextureCoord = aTextureCoord;
+        gl_Position = uPMatrix * uMVMatrix * vec4(vertexPosition, 1.0);
+        textureCoord = vertexTextureCoord;
     }
 </script>
 
@@ -128,7 +192,7 @@
     }
 
     // Creates a ready-to-use shader program using given fs and vs
-    function createShaderProgram(fsid, vsid, lighting, texture) {
+    function createShaderProgram(fsid, vsid) {
         var fs = getShader(gl, fsid);
         var vs = getShader(gl, vsid);
 
@@ -144,11 +208,11 @@
         gl.useProgram(p);
 
         // enable vertices to be passed in at once as attributes
-        p.vertexPositionAttribute = gl.getAttribLocation(p, "aVertexPosition");
+        p.vertexPositionAttribute = gl.getAttribLocation(p, "vertexPosition");
         gl.enableVertexAttribArray(p.vertexPositionAttribute);
 
         // enable vertex normals to be passed in at once as attributes
-        p.vertexNormalAttribute = gl.getAttribLocation(p, "aVertexNormal");
+        p.vertexNormalAttribute = gl.getAttribLocation(p, "vertexNormal");
         gl.enableVertexAttribArray(p.vertexNormalAttribute);
 
         // Remember locations for uniform variables for matrices
@@ -156,11 +220,11 @@
         p.mvMatrixUniform = gl.getUniformLocation(p, "uMVMatrix");
         p.nMatrixUniform = gl.getUniformLocation(p, "uNMatrix");
 
-        if(texture) {
-            p.textureCoordAttribute = gl.getAttribLocation(p, "aTextureCoord");
-            gl.enableVertexAttribArray(p.textureCoordAttribute); 
-            p.samplerUniform = gl.getUniformLocation(p, "uSampler");
-        }
+        p.textureCoordAttribute = gl.getAttribLocation(p, "vertexTextureCoord");
+        gl.enableVertexAttribArray(p.textureCoordAttribute); 
+        
+        p.samplerUniform = gl.getUniformLocation(p, "textureSampler");
+        p.textureFlag = gl.getUniformLocation(p, "texture");
 
         return p;
     }
@@ -170,8 +234,8 @@
     var exoplanetShaderProgram;
     var solarShaderProgram;
     function initShaders() {
-        exoplanetShaderProgram = createShaderProgram("exoplanet-shader-fs", "exoplanet-shader-vs", texture=false);
-        solarShaderProgram = createShaderProgram("solar-shader-fs", "solar-shader-vs", texture=true);
+        exoplanetShaderProgram = createShaderProgram("exoplanet-shader-fs", "exoplanet-shader-vs");
+        solarShaderProgram = createShaderProgram("solar-shader-fs", "solar-shader-vs");
     }
 
     var mvMatrix = mat4.create();
@@ -473,7 +537,7 @@
 
     // Draws everything - called per frame
     function drawScene() {
-        currentProgram = solarShaderProgram;
+        currentProgram = exoplanetShaderProgram;
         gl.useProgram(currentProgram);
         
         for(var i=0; i<=bodies.length; i++) {
@@ -492,6 +556,7 @@
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, body.texture);
             gl.uniform1i(currentProgram.samplerUniform, 0);
+            gl.uniform1i(currentProgram.textureFlag, 1);
 
             gl.bindBuffer(gl.ARRAY_BUFFER, body.vertexPositionBuffer);
             gl.vertexAttribPointer(currentProgram.vertexPositionAttribute, body.vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
@@ -513,13 +578,14 @@
         }
         
         // Draw exoplanets
-        currentProgram = exoplanetShaderProgram;
-        gl.useProgram(currentProgram);
         for(var i=0; i<exoplanets.length; i++) {
             mvPushMatrix();
             mat4.rotate(mvMatrix, degToRad(exoplanets[i].elev), [1,0,0]);
             mat4.rotate(mvMatrix, degToRad(exoplanets[i].azith), [0,1,0]);
             mat4.translate(mvMatrix, [exoplanets[i].orbitRadius, 0, 0]);
+            
+            // Turn off texturing
+            gl.uniform1i(currentProgram.textureFlag, 1);
 
             gl.bindBuffer(gl.ARRAY_BUFFER, exoplanets[i].vertexPositionBuffer);
             gl.vertexAttribPointer(currentProgram.vertexPositionAttribute, exoplanets[i].vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
