@@ -1,0 +1,607 @@
+<html>
+
+<head>
+<title>Learning WebGL &mdash; lesson 11</title>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
+<style type="text/css">
+#space {
+    border: none;
+}
+</style>
+
+<script type="text/javascript" src="jquery-1.8.2.min.js"></script>  
+<script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
+<script type="text/javascript" src="webgl-utils.js"></script>
+
+<!-- exoplanet shaders --!>
+<script id="exoplanet-shader-fs" type="x-shader/x-fragment">
+    precision mediump float;
+
+    varying vec2 vTextureCoord;
+    varying vec3 vLightWeighting;
+
+    void main(void) {
+        gl_FragColor = vec4(1,1,1,1);
+    }
+</script>
+
+<script id="exoplanet-shader-vs" type="x-shader/x-vertex">
+    attribute vec3 aVertexPosition;
+    attribute vec3 aVertexNormal;
+    attribute vec2 aTextureCoord;
+
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+    uniform mat3 uNMatrix;
+
+    void main(void) {
+        gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+    }
+</script>
+
+<!-- solar shaders --!>
+<script id="solar-shader-fs" type="x-shader/x-fragment">
+    precision mediump float;
+
+    varying vec2 vTextureCoord;
+
+    uniform sampler2D uSampler;
+
+    void main(void) {
+        vec4 textureColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
+        gl_FragColor = vec4(textureColor.rgb, textureColor.a);
+    }
+</script>
+
+<script id="solar-shader-vs" type="x-shader/x-vertex">
+    attribute vec3 aVertexPosition;
+    attribute vec3 aVertexNormal;
+    attribute vec2 aTextureCoord;
+
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+    uniform mat3 uNMatrix;
+
+    varying vec2 vTextureCoord;
+
+    void main(void) {
+        gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+        vTextureCoord = aTextureCoord;
+    }
+</script>
+
+
+<script type="text/javascript">
+    
+    var solarsystemData;
+    var exoplanetData;
+    var allBodies = {};
+    var gl;
+
+    function initGL(canvas) {
+        try {
+            gl = canvas.getContext("experimental-webgl");
+            gl.viewportWidth = canvas.width;
+            gl.viewportHeight = canvas.height;
+        } catch (e) {
+        }
+        if (!gl) {
+            alert("Could not initialise WebGL, sorry :-(");
+        }
+    }
+
+
+    function getShader(gl, id) {
+        var shaderScript = document.getElementById(id);
+        if (!shaderScript) {
+            return null;
+        }
+
+        var str = "";
+        var k = shaderScript.firstChild;
+        while (k) {
+            if (k.nodeType == 3) {
+                str += k.textContent;
+            }
+            k = k.nextSibling;
+        }
+
+        var shader;
+        if (shaderScript.type == "x-shader/x-fragment") {
+            shader = gl.createShader(gl.FRAGMENT_SHADER);
+        } else if (shaderScript.type == "x-shader/x-vertex") {
+            shader = gl.createShader(gl.VERTEX_SHADER);
+        } else {
+            return null;
+        }
+
+        gl.shaderSource(shader, str);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            alert(gl.getShaderInfoLog(shader));
+            return null;
+        }
+
+        return shader;
+    }
+
+    // Creates a ready-to-use shader program using given fs and vs
+    function createShaderProgram(fsid, vsid, lighting, texture) {
+        var fs = getShader(gl, fsid);
+        var vs = getShader(gl, vsid);
+
+        p = gl.createProgram();
+        gl.attachShader(p, vs);
+        gl.attachShader(p, fs);
+        gl.linkProgram(p);
+
+        if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+            alert("Could not initialise shaders");
+        }
+        
+        gl.useProgram(p);
+
+        // enable vertices to be passed in at once as attributes
+        p.vertexPositionAttribute = gl.getAttribLocation(p, "aVertexPosition");
+        gl.enableVertexAttribArray(p.vertexPositionAttribute);
+
+        // enable vertex normals to be passed in at once as attributes
+        p.vertexNormalAttribute = gl.getAttribLocation(p, "aVertexNormal");
+        gl.enableVertexAttribArray(p.vertexNormalAttribute);
+
+        // Remember locations for uniform variables for matrices
+        p.pMatrixUniform = gl.getUniformLocation(p, "uPMatrix");
+        p.mvMatrixUniform = gl.getUniformLocation(p, "uMVMatrix");
+        p.nMatrixUniform = gl.getUniformLocation(p, "uNMatrix");
+
+        if(texture) {
+            p.textureCoordAttribute = gl.getAttribLocation(p, "aTextureCoord");
+            gl.enableVertexAttribArray(p.textureCoordAttribute); 
+            p.samplerUniform = gl.getUniformLocation(p, "uSampler");
+        }
+
+        return p;
+    }
+
+
+    var currentProgram;
+    var exoplanetShaderProgram;
+    var solarShaderProgram;
+    function initShaders() {
+        exoplanetShaderProgram = createShaderProgram("exoplanet-shader-fs", "exoplanet-shader-vs", texture=false);
+        solarShaderProgram = createShaderProgram("solar-shader-fs", "solar-shader-vs", texture=true);
+    }
+
+    var mvMatrix = mat4.create();
+    var mvMatrixStack = [];
+    var pMatrix = mat4.create();
+
+    function mvPushMatrix() {
+        var copy = mat4.create();
+        mat4.set(mvMatrix, copy);
+        mvMatrixStack.push(copy);
+    }
+
+    function mvPopMatrix() {
+        if (mvMatrixStack.length == 0) {
+            throw "Invalid popMatrix!";
+        }
+        mvMatrix = mvMatrixStack.pop();
+    }
+
+    function setMatrixUniforms() {
+        gl.uniformMatrix4fv(currentProgram.pMatrixUniform, false, pMatrix);
+        gl.uniformMatrix4fv(currentProgram.mvMatrixUniform, false, mvMatrix);
+
+        var normalMatrix = mat3.create();
+        mat4.toInverseMat3(mvMatrix, normalMatrix);
+        mat3.transpose(normalMatrix);
+        gl.uniformMatrix3fv(currentProgram.nMatrixUniform, false, normalMatrix);
+    }
+
+
+    function degToRad(degrees) {
+        return degrees * Math.PI / 180;
+    }
+
+
+    // Camera location, spherical coords center on the sun
+    var distance = 20, azith = 0, elev = 0;
+
+    // Mouse events
+    var mouseDown = false;
+    var lastMouseX = null;
+    var lastMouseY = null;
+
+    function handleMouseDown(event) {
+        mouseDown = true;
+        lastMouseX = event.clientX;
+        lastMouseY = event.clientY;
+    }
+    function handleMouseUp(event) {
+        mouseDown = false;
+    }
+    function handleMouseMove(event) {
+        if (!mouseDown) {
+            return;
+        }
+        // get the vector that we just dragged (dx, dy)
+        var newX = event.clientX;
+        var newY = event.clientY;
+        var deltaX = newX - lastMouseX;
+        var deltaY = newY - lastMouseY;
+        lastMouseX = newX;
+        lastMouseY = newY;
+
+        // turn that into rotation
+        var sens = 0.1; //sensitivity
+        azith += deltaX * sens;
+        elev += deltaY * sens;
+    }
+
+
+    // Key events
+    var keysPressed = {}
+    var zoomFactor = 1.10;
+    function handleKeyDown(event) {
+        var char = String.fromCharCode(event.keyCode);
+        keysPressed[char] = true;
+        if(char.toLowerCase() == "w"){
+            zoom(1/zoomFactor);
+        } else if(char.toLowerCase() == "s"){
+            zoom(zoomFactor);
+        }
+    }
+    function handleKeyUp(event) {
+        keysPressed[String.fromCharCode(event.keyCode)] = false;
+    }
+    function zoom(factor){
+        distance *= factor;
+    }
+
+
+    function handleLoadedTexture(texture) {
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texture.image);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+        gl.generateMipmap(gl.TEXTURE_2D);
+
+        gl.bindTexture(gl.TEXTURE_2D, null);
+    }
+
+    function initTexture(texturePath) {
+        texture = gl.createTexture();
+        texture.image = new Image();
+        texture.image.src = texturePath;
+        return texture;
+    }
+
+    function initBody(name, radius, azith, elev, orbitRadius, texturePath) {
+
+        //TODO: modify according to radius
+        var latitudeBands = 30;
+        var longitudeBands = 30;
+
+        var body = {};
+        body.name = name;
+        body.radius = radius;
+        body.azith = azith;
+        body.elev = elev;
+        body.orbitRadius = orbitRadius;
+        if(texturePath!="") body.texture = initTexture(texturePath);
+
+        // save for lookup
+        allBodies[name] = body;
+
+        var vertexPositionData = [];
+        var normalData = [];
+        var textureCoordData = [];
+        for (var latNumber=0; latNumber <= latitudeBands; latNumber++) {
+            var theta = latNumber * Math.PI / latitudeBands;
+            var sinTheta = Math.sin(theta);
+            var cosTheta = Math.cos(theta);
+
+            for (var longNumber=0; longNumber <= longitudeBands; longNumber++) {
+                var phi = longNumber * 2 * Math.PI / longitudeBands;
+                var sinPhi = Math.sin(phi);
+                var cosPhi = Math.cos(phi);
+
+                var x = cosPhi * sinTheta;
+                var y = cosTheta;
+                var z = sinPhi * sinTheta;
+                var u = 1 - (longNumber / longitudeBands);
+                var v = 1 - (latNumber / latitudeBands);
+
+                normalData.push(x);
+                normalData.push(y);
+                normalData.push(z);
+                textureCoordData.push(u);
+                textureCoordData.push(v);
+                vertexPositionData.push(body.radius * x);
+                vertexPositionData.push(body.radius * y);
+                vertexPositionData.push(body.radius * z);
+            }
+        }
+
+        var indexData = [];
+        for (var latNumber=0; latNumber < latitudeBands; latNumber++) {
+            for (var longNumber=0; longNumber < longitudeBands; longNumber++) {
+                var first = (latNumber * (longitudeBands + 1)) + longNumber;
+                var second = first + longitudeBands + 1;
+                indexData.push(first);
+                indexData.push(second);
+                indexData.push(first + 1);
+
+                indexData.push(second);
+                indexData.push(second + 1);
+                indexData.push(first + 1);
+            }
+        }
+
+        body.vertexNormalBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, body.vertexNormalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normalData), gl.STATIC_DRAW);
+        body.vertexNormalBuffer.itemSize = 3;
+        body.vertexNormalBuffer.numItems = normalData.length / 3;
+
+        body.vertexTextureCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, body.vertexTextureCoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordData), gl.STATIC_DRAW);
+        body.vertexTextureCoordBuffer.itemSize = 2;
+        body.vertexTextureCoordBuffer.numItems = textureCoordData.length / 2;
+
+        body.vertexPositionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, body.vertexPositionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPositionData), gl.STATIC_DRAW);
+        body.vertexPositionBuffer.itemSize = 3;
+        body.vertexPositionBuffer.numItems = vertexPositionData.length / 3;
+
+        body.vertexIndexBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, body.vertexIndexBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indexData), gl.STATIC_DRAW);
+        body.vertexIndexBuffer.itemSize = 1;
+        body.vertexIndexBuffer.numItems = indexData.length;
+
+        return body;
+    }
+
+    // Hack
+    function pause(milliseconds) {
+        var dt = new Date();
+        while ((new Date()) - dt <= milliseconds) { /* Do nothing */ }
+    } 
+
+    var sun;
+    var bodies = []
+    var exoplanets = []
+    function initBodies() {
+        var radiusMultiplier = 1;
+        var distanceMultiplier = 1;
+        var kmAu = 149597870; // mean distance from earth to sun in km
+        var kmSunRadius = 695500;
+        var displayedSunRadius = radiusMultiplier*kmSunRadius/kmAu;
+        sun = initBody("Sun", displayedSunRadius, 0, 0, 0, 'textures/sun.gif');
+
+        for(planet in solarsystemData) {
+            planetData = solarsystemData[planet];
+            bodies.push(
+                initBody(
+                    planet, // name
+                    100*radiusMultiplier*planetData['radiuse']/kmAu, //radius
+                    5.0,
+                    0.0,
+                    distanceMultiplier*planetData['au']+displayedSunRadius, // orb radius
+                    planetData['image'] // tex path
+                )
+            );
+        }
+
+        var azith = 0.0; //TODO: actual physical azith/elev instead of a spiral?
+        var kmEarthRadius = solarsystemData['Earth']['radiuse'];
+        for(var i=0; i<exoplanetData.length; i++) {
+            var planet = exoplanetData[i];
+            exoplanets.push(
+                initBody(
+                    planet['pl_hostname']+planet['pl_letter'], //name
+                    radiusMultiplier*planet['pl_rade']*kmEarthRadius/kmAu, //radius
+                    azith,
+                    0.0, 
+                    distanceMultiplier*planet['pl_orbsmax']+displayedSunRadius, //orbit radius
+                    "" //texture pah
+                )
+            );
+            azith += 10.0;
+        }
+    }
+
+    var planetZoomTarget = null, planetZoomT = 0.0;
+    function handlePlanetZoom() {
+        if(!planetZoomTarget) {
+            return;
+        }
+
+        // start animation
+        if(planetZoomT == 0){
+            var body = allBodies[planetZoomTarget];
+            var azith0 = azith;
+            while(azith0 > body.azith) azith0 -= 360.0;
+            if(body.azith - azith0 > 180.0) azith0 += 360;
+            planetZoomPoints = [
+                {r:Math.abs(distance), elev:elev, azith:azith0},
+                {r:body.orbitRadius + body.radius*50, elev:body.elev, azith:body.azith}
+            ];
+        }
+
+        // animation -- update the camera location
+        var t = planetZoomT;
+        azith = planetZoomPoints[0].azith*(1-t) + planetZoomPoints[1].azith*t;
+        elev = planetZoomPoints[0].elev*(1-t) + planetZoomPoints[1].elev*t;
+        // quadratic "bounce" for the camera distance from the sun, zoom out and "swoop" back in
+        // dist = at^2 + bt + c
+        var a = -10; 
+        var b = planetZoomPoints[1].r - planetZoomPoints[0].r - a;
+        var c = planetZoomPoints[0].r;
+        distance = a*t*t + b*t + c;
+
+        // end animation
+        if(planetZoomT == 1.0){
+            planetZoomT = 0.0;
+            planetZoomTarget = 0.0;
+        } else {
+            // advance the animation
+            planetZoomT += 1/30;
+            if(planetZoomT > 1.0){
+                planetZoomT = 1.0;
+            }
+        }
+    }
+
+    function setMatrices() {
+        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        mat4.perspective(15, gl.viewportWidth / gl.viewportHeight, 0.001, 10000.0, pMatrix);
+        mat4.identity(mvMatrix);
+        mat4.translate(mvMatrix, [0, 0, -distance]);
+        mat4.rotate(mvMatrix, -degToRad(elev), [1, 0, 0]);
+        mat4.rotate(mvMatrix, -degToRad(azith), [0, 1, 0]);
+    }
+
+    // Draws everything - called per frame
+    function drawScene() {
+        currentProgram = solarShaderProgram;
+        gl.useProgram(currentProgram);
+        
+        for(var i=0; i<=bodies.length; i++) {
+            mvPushMatrix();
+            var body;
+            if (i==bodies.length) {
+                body = sun;
+            } else {
+                body = bodies[i];
+            }
+            mat4.rotate(mvMatrix, degToRad(body.azith), [0,1,0]);
+            mat4.rotate(mvMatrix, degToRad(body.elev), [1,0,0]);
+            mat4.translate(mvMatrix, [0, 0, body.orbitRadius]);
+
+            handleLoadedTexture(body.texture);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, body.texture);
+            gl.uniform1i(currentProgram.samplerUniform, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, body.vertexPositionBuffer);
+            gl.vertexAttribPointer(currentProgram.vertexPositionAttribute, body.vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, body.vertexTextureCoordBuffer);
+            gl.vertexAttribPointer(currentProgram.textureCoordAttribute, body.vertexTextureCoordBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, body.vertexNormalBuffer);
+            gl.vertexAttribPointer(currentProgram.vertexNormalAttribute, body.vertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, body.vertexIndexBuffer);
+            setMatrixUniforms();
+            gl.drawElements(gl.TRIANGLES, body.vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+            gl.bindTexture(gl.TEXTURE_2D, null);
+
+            mvPopMatrix();
+            var cameraPos = [0,0,0];
+            mat4.multiplyVec3(mvMatrix, cameraPos);
+        }
+        
+        // Draw exoplanets
+        currentProgram = exoplanetShaderProgram;
+        gl.useProgram(currentProgram);
+        for(var i=0; i<exoplanets.length; i++) {
+            mvPushMatrix();
+            mat4.rotate(mvMatrix, degToRad(exoplanets[i].elev), [1,0,0]);
+            mat4.rotate(mvMatrix, degToRad(exoplanets[i].azith), [0,1,0]);
+            mat4.translate(mvMatrix, [exoplanets[i].orbitRadius, 0, 0]);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, exoplanets[i].vertexPositionBuffer);
+            gl.vertexAttribPointer(currentProgram.vertexPositionAttribute, exoplanets[i].vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, exoplanets[i].vertexNormalBuffer);
+            gl.vertexAttribPointer(currentProgram.vertexNormalAttribute, exoplanets[i].vertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, exoplanets[i].vertexIndexBuffer);
+            setMatrixUniforms();
+            gl.drawElements(gl.TRIANGLES, exoplanets[i].vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+
+            mvPopMatrix();
+        } 
+    }
+
+    function tick() {
+        requestAnimFrame(tick);
+        setMatrices();
+        drawScene();
+        handlePlanetZoom();
+    }
+
+
+    function webGLStart() {
+        var canvas = document.getElementById("space");
+        initGL(canvas);
+        initShaders();
+        initBodies();
+
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        gl.enable(gl.DEPTH_TEST);
+
+        canvas.onmousedown = handleMouseDown;
+        document.onmouseup = handleMouseUp;
+        document.onmousemove = handleMouseMove;
+        document.onkeydown = handleKeyDown;
+        document.onkeyup = handleKeyUp;
+
+        tick();
+    }
+
+    $(document).ready(function() {
+        
+        // Load data and start webgl visualization
+        $.getJSON('solarsystem.json', function(sd) {
+            solarsystemData = sd;
+            $.getJSON('exoplanets_with_radii.json', function(ed) {
+                exoplanetData = ed;
+                webGLStart();
+            });
+        });
+    
+        // Make zoom available
+        $('.zoom').click(function() {
+            planetZoomTarget = $(this).attr('id');
+        });
+
+    });
+
+</script>
+
+
+</head>
+
+
+<body>
+    <a href="http://learningwebgl.com/blog/?p=1253">&lt;&lt; Back to Lesson 11</a><br />
+
+    <canvas id="space" width="1024" height="512"></canvas>
+    <br/>
+
+    <button id="Earth" class="zoom">Earth</button>
+    <input type="checkbox" id="lighting" checked /> Use lighting<br/>
+    Spin the moon by dragging it with the mouse.
+    <br/>
+    <br/>
+
+    Moon texture courtesy of <a href="http://maps.jpl.nasa.gov/">the Jet Propulsion Laboratory</a>.
+    <br/>
+    <br/>
+
+    <a href="http://learningwebgl.com/blog/?p=1253">&lt;&lt; Back to Lesson 11</a><br />
+</body>
+
+</html>
