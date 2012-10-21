@@ -76,6 +76,7 @@
     
     var solarsystemData;
     var exoplanetData;
+    var allBodies = {};
     var gl;
 
     function initGL(canvas) {
@@ -206,14 +207,13 @@
     }
 
 
+    // Camera location, spherical coords center on the sun
+    var distance = 20, azith = 0, elev = 0;
+
     // Mouse events
-    var distance = -20;
     var mouseDown = false;
     var lastMouseX = null;
     var lastMouseY = null;
-
-    var moonRotationMatrix = mat4.create();
-    mat4.identity(moonRotationMatrix);
 
     function handleMouseDown(event) {
         mouseDown = true;
@@ -236,14 +236,9 @@
         lastMouseY = newY;
 
         // turn that into rotation
-        var newRotationMatrix = mat4.create();
-        mat4.identity(newRotationMatrix);
-        
-        // sensitivity
-        var sens = 0.1;
-        mat4.rotate(newRotationMatrix, degToRad(deltaX * sens), [0, 1, 0]);
-        mat4.rotate(newRotationMatrix, degToRad(deltaY * sens), [1, 0, 0]);
-        mat4.multiply(newRotationMatrix, moonRotationMatrix, moonRotationMatrix);
+        var sens = 0.1; //sensitivity
+        azith += deltaX * sens;
+        elev += deltaY * sens;
     }
 
 
@@ -285,15 +280,22 @@
         return texture;
     }
 
-    function initBody(radius, orbitRadius, texturePath) {
+    function initBody(name, radius, azith, elev, orbitRadius, texturePath) {
+
         //TODO: modify according to radius
         var latitudeBands = 30;
         var longitudeBands = 30;
 
         var body = {};
+        body.name = name;
         body.radius = radius;
+        body.azith = azith;
+        body.elev = elev;
         body.orbitRadius = orbitRadius;
         if(texturePath!="") body.texture = initTexture(texturePath);
+
+        // save for lookup
+        allBodies[name] = body;
 
         var vertexPositionData = [];
         var normalData = [];
@@ -382,44 +384,97 @@
         var kmAu = 149597870; // mean distance from earth to sun in km
         var kmSunRadius = 695500;
         var displayedSunRadius = radiusMultiplier*kmSunRadius/kmAu;
-        sun = initBody(displayedSunRadius, 0, 'textures/sun.gif');
+        sun = initBody("Sun", displayedSunRadius, 0, 0, 0, 'textures/sun.gif');
+
         for(planet in solarsystemData) {
             planetData = solarsystemData[planet];
             bodies.push(
                 initBody(
-                    radius=100*radiusMultiplier*planetData['radiuse']/kmAu,
-                    orbitRadius=distanceMultiplier*planetData['au']+displayedSunRadius,
-                    texturePath=planetData['image']
+                    planet, // name
+                    100*radiusMultiplier*planetData['radiuse']/kmAu, //radius
+                    5.0,
+                    0.0,
+                    distanceMultiplier*planetData['au']+displayedSunRadius, // orb radius
+                    planetData['image'] // tex path
                 )
             );
         }
 
+        var azith = 0.0; //TODO: actual physical azith/elev instead of a spiral?
         var kmEarthRadius = solarsystemData['Earth']['radiuse'];
         for(var i=0; i<exoplanetData.length; i++) {
             var planet = exoplanetData[i];
             exoplanets.push(
                 initBody(
-                    radius=radiusMultiplier*planet['pl_rade']*kmEarthRadius/kmAu,
-                    orbitRadius=distanceMultiplier*planet['pl_orbsmax']+displayedSunRadius,
-                    texturePath=""
+                    planet['pl_hostname']+planet['pl_letter'], //name
+                    radiusMultiplier*planet['pl_rade']*kmEarthRadius/kmAu, //radius
+                    azith,
+                    0.0, 
+                    distanceMultiplier*planet['pl_orbsmax']+displayedSunRadius, //orbit radius
+                    "" //texture pah
                 )
-            ) 
+            );
+            azith += 10.0;
         }
-        alert(exoplanets.length);
     }
 
+    var planetZoomTarget = null, planetZoomT = 0.0;
+    function handlePlanetZoom() {
+        if(!planetZoomTarget) {
+            return;
+        }
 
-    function drawScene() {
+        // start animation
+        if(planetZoomT == 0){
+            var body = allBodies[planetZoomTarget];
+            var azith0 = azith;
+            while(azith0 > body.azith) azith0 -= 360.0;
+            if(body.azith - azith0 > 180.0) azith0 += 360;
+            planetZoomPoints = [
+                {r:Math.abs(distance), elev:elev, azith:azith0},
+                {r:body.orbitRadius + body.radius*50, elev:body.elev, azith:body.azith}
+            ];
+        }
+
+        // animation -- update the camera location
+        var t = planetZoomT;
+        azith = planetZoomPoints[0].azith*(1-t) + planetZoomPoints[1].azith*t;
+        elev = planetZoomPoints[0].elev*(1-t) + planetZoomPoints[1].elev*t;
+        // quadratic "bounce" for the camera distance from the sun, zoom out and "swoop" back in
+        // dist = at^2 + bt + c
+        var a = -10; 
+        var b = planetZoomPoints[1].r - planetZoomPoints[0].r - a;
+        var c = planetZoomPoints[0].r;
+        distance = a*t*t + b*t + c;
+
+        // end animation
+        if(planetZoomT == 1.0){
+            planetZoomT = 0.0;
+            planetZoomTarget = 0.0;
+        } else {
+            // advance the animation
+            planetZoomT += 1/30;
+            if(planetZoomT > 1.0){
+                planetZoomT = 1.0;
+            }
+        }
+    }
+
+    function setMatrices() {
         gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         mat4.perspective(15, gl.viewportWidth / gl.viewportHeight, 0.001, 10000.0, pMatrix);
+        mat4.identity(mvMatrix);
+        mat4.translate(mvMatrix, [0, 0, -distance]);
+        mat4.rotate(mvMatrix, -degToRad(elev), [1, 0, 0]);
+        mat4.rotate(mvMatrix, -degToRad(azith), [0, 1, 0]);
+    }
 
+    // Draws everything - called per frame
+    function drawScene() {
         currentProgram = solarShaderProgram;
         gl.useProgram(currentProgram);
-        mat4.identity(mvMatrix);
-        mat4.translate(mvMatrix, [0, 0, distance]);
-        mat4.multiply(mvMatrix, moonRotationMatrix);
         
         for(var i=0; i<=bodies.length; i++) {
             mvPushMatrix();
@@ -429,8 +484,9 @@
             } else {
                 body = bodies[i];
             }
-            mat4.rotate(mvMatrix, degToRad(5), [0,1,0]);
-            mat4.translate(mvMatrix, [body.orbitRadius, 0, 0]);
+            mat4.rotate(mvMatrix, degToRad(body.azith), [0,1,0]);
+            mat4.rotate(mvMatrix, degToRad(body.elev), [1,0,0]);
+            mat4.translate(mvMatrix, [0, 0, body.orbitRadius]);
 
             handleLoadedTexture(body.texture);
             gl.activeTexture(gl.TEXTURE0);
@@ -452,17 +508,17 @@
             gl.bindTexture(gl.TEXTURE_2D, null);
 
             mvPopMatrix();
+            var cameraPos = [0,0,0];
+            mat4.multiplyVec3(mvMatrix, cameraPos);
         }
         
         // Draw exoplanets
-        var planetRotationMatrix = mat4.create();
-        mat4.identity(planetRotationMatrix);
-        
         currentProgram = exoplanetShaderProgram;
         gl.useProgram(currentProgram);
         for(var i=0; i<exoplanets.length; i++) {
             mvPushMatrix();
-            mat4.rotate(mvMatrix, degToRad(10*i), [0,1,0]);
+            mat4.rotate(mvMatrix, degToRad(exoplanets[i].elev), [1,0,0]);
+            mat4.rotate(mvMatrix, degToRad(exoplanets[i].azith), [0,1,0]);
             mat4.translate(mvMatrix, [exoplanets[i].orbitRadius, 0, 0]);
 
             gl.bindBuffer(gl.ARRAY_BUFFER, exoplanets[i].vertexPositionBuffer);
@@ -479,10 +535,11 @@
         } 
     }
 
-
     function tick() {
         requestAnimFrame(tick);
+        setMatrices();
         drawScene();
+        handlePlanetZoom();
     }
 
 
@@ -505,6 +562,8 @@
     }
 
     $(document).ready(function() {
+        
+        // Load data and start webgl visualization
         $.getJSON('solarsystem.json', function(sd) {
             solarsystemData = sd;
             $.getJSON('exoplanets_with_radii.json', function(ed) {
@@ -512,6 +571,12 @@
                 webGLStart();
             });
         });
+    
+        // Make zoom available
+        $('.zoom').click(function() {
+            planetZoomTarget = $(this).attr('id');
+        });
+
     });
 
 </script>
@@ -526,38 +591,10 @@
     <canvas id="space" width="1024" height="512"></canvas>
     <br/>
 
+    <button id="Earth" class="zoom">Earth</button>
     <input type="checkbox" id="lighting" checked /> Use lighting<br/>
     Spin the moon by dragging it with the mouse.
     <br/>
-
-    <h2>Directional light:</h2>
-
-    <table style="border: 0; padding: 10px;">
-        <tr>
-            <td><b>Direction:</b>
-            <td>X: <input type="text" id="lightDirectionX" value="-1.0" />
-            <td>Y: <input type="text" id="lightDirectionY" value="-1.0" />
-            <td>Z: <input type="text" id="lightDirectionZ" value="-1.0" />
-        </tr>
-        <tr>
-            <td><b>Colour:</b>
-            <td>R: <input type="text" id="directionalR" value="0.8" />
-            <td>G: <input type="text" id="directionalG" value="0.8" />
-            <td>B: <input type="text" id="directionalB" value="0.8" />
-        </tr>
-    </table>
-
-
-    <h2>Ambient light:</h2>
-
-    <table style="border: 0; padding: 10px;">
-        <tr>
-            <td><b>Colour:</b>
-            <td>R: <input type="text" id="ambientR" value="0.2" />
-            <td>G: <input type="text" id="ambientG" value="0.2" />
-            <td>B: <input type="text" id="ambientB" value="0.2" />
-        </tr>
-    </table>
     <br/>
 
     Moon texture courtesy of <a href="http://maps.jpl.nasa.gov/">the Jet Propulsion Laboratory</a>.
