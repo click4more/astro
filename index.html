@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<head>
+    <title>Many Worlds</title>
+    <style>
+@import url(http://fonts.googleapis.com/css?family=Yanone+Kaffeesatz:700);
+body {
+    background: black; 
+    font: "Yanone Kaffeesatz","Helvetica Neue",sans-serif;
+    color: #ffffee;
+}
+
+#sky {
+    width:800px;
+    height:600px;
+}
+    </style>
+</head>
+<body>
+<h1>Many Worlds</h1>
+<h2><a href="http://dcpos.ch">DC</a> and <a href="http://jiwonk.im">Jiwon</a></h2>
+<canvas id="sky"></canvas>
+
+<!--<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/ember.js/1.0.pre/ember-1.0.pre.min.js"></script>-->
+<!--<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/three.js/r50/three.min.js"></script>-->
+<!-- Bundled with DCGL:
+<script type="text/javascript" src="js/webgl-utils.js"></script>
+<script type="text/javascript" src="js/gl-matrix-min.js"></script>
+<script type="text/javascript" src="js/webgl-debug.js"></script>-->
+
+<script type="text/javascript" src="js/jquery.min.js"></script>
+<script type="text/javascript" src="dcgl/dcgl.bundle.js"></script>
+
+
+<script type="text/javascript">
+function drawScene(gl){
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    // set shaders
+    var shaderProg = DCGL.getShaderProgram("star-vs", "star-fs",
+        ["uMVMatrix", "uPMatrix", "aPos"], gl);
+    gl.useProgram(shaderProg);
+
+    // set matrices
+    // ... model-view matrix
+    var mvmat = mat4.create(), pmat = mat4.create();
+    mat4.identity(mvmat);
+    mat4.rotate(mvmat, -gl.camera.elev, [1,0,0]);
+    mat4.rotate(mvmat, -gl.camera.azith, [0,1,0]);
+    mat4.translate(mvmat, [
+        -gl.camera.loc[0],
+        -gl.camera.loc[1],
+        -gl.camera.loc[2]]);
+    // ... projection matrix
+    var aspectRatio = gl.canvas.width / gl.canvas.height;
+    mat4.perspective(50, aspectRatio, 1.0, 10000.0, pmat);
+    // ... send them to the shader
+    gl.uniformMatrix4fv(shaderProg.loc.uMVMatrix, false, mvmat);
+    gl.uniformMatrix4fv(shaderProg.loc.uPMatrix, false, pmat);
+
+    // render stars
+    var bufStars = gl.buffers.stars;
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufStars);
+    gl.vertexAttribPointer(shaderProg.loc.aPos, 
+        bufStars.elemSize, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.POINTS, 0, bufStars.numElems);
+}
+
+
+$(function(){
+    // create gl
+    var canvas = $("#sky")[0];
+    canvas.width = $("#sky").width();
+    canvas.height = $("#sky").height();
+    var gl = DCGL.createGL(canvas);
+
+    // load data
+    var arrStars = [];
+    for(var i = 0; i < 3000; i++){
+        arrStars.push(Math.random()*200 - 100);
+    }
+    gl.buffers.stars = DCGL.createBuffer(arrStars, 3, gl);
+
+    // add handlers
+    $("#sky").mousedown(function(e){ onMouseDown(e, gl); });
+    $("#sky").mouseup(function(e){ onMouseUp(e, gl); });
+
+    //animate
+    DCGL.animate(function(){
+        drawScene(gl);
+    }, canvas);
+});
+</script>
+
+
+<script id="star-vs" type="x-shader/x-vertex">
+    attribute vec3 aPos;
+
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+
+    void main(void) {
+        gl_Position = uPMatrix * uMVMatrix * vec4(aPos, 1.0);
+        gl_PointSize = 2.0;
+    }
+</script>
+<script id="star-fs" type="x-shader/x-fragment">
+    precision mediump float;
+
+    void main(void) {
+        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+    }
+</script>
+
+
+</body>
+
