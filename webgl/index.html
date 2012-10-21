@@ -1,0 +1,570 @@
+<html>
+
+<head>
+<title>Learning WebGL &mdash; lesson 11</title>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
+<style type="text/css">
+#space {
+    border: none;
+}
+</style>
+
+<script type="text/javascript" src="jquery-1.8.2.min.js"></script>  
+<script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
+<script type="text/javascript" src="webgl-utils.js"></script>
+
+<!-- exoplanet shaders --!>
+<script id="exoplanet-shader-fs" type="x-shader/x-fragment">
+    precision mediump float;
+
+    varying vec2 vTextureCoord;
+    varying vec3 vLightWeighting;
+
+    void main(void) {
+        gl_FragColor = vec4(1,1,1,1);
+    }
+</script>
+
+<script id="exoplanet-shader-vs" type="x-shader/x-vertex">
+    attribute vec3 aVertexPosition;
+    attribute vec3 aVertexNormal;
+    attribute vec2 aTextureCoord;
+
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+    uniform mat3 uNMatrix;
+
+    void main(void) {
+        gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+    }
+</script>
+
+<!-- solar shaders --!>
+<script id="solar-shader-fs" type="x-shader/x-fragment">
+    precision mediump float;
+
+    varying vec2 vTextureCoord;
+
+    uniform sampler2D uSampler;
+
+    void main(void) {
+        vec4 textureColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
+        gl_FragColor = vec4(textureColor.rgb, textureColor.a);
+    }
+</script>
+
+<script id="solar-shader-vs" type="x-shader/x-vertex">
+    attribute vec3 aVertexPosition;
+    attribute vec3 aVertexNormal;
+    attribute vec2 aTextureCoord;
+
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+    uniform mat3 uNMatrix;
+
+    varying vec2 vTextureCoord;
+
+    void main(void) {
+        gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+        vTextureCoord = aTextureCoord;
+    }
+</script>
+
+
+<script type="text/javascript">
+    
+    var solarsystemData;
+    var exoplanetData;
+    var gl;
+
+    function initGL(canvas) {
+        try {
+            gl = canvas.getContext("experimental-webgl");
+            gl.viewportWidth = canvas.width;
+            gl.viewportHeight = canvas.height;
+        } catch (e) {
+        }
+        if (!gl) {
+            alert("Could not initialise WebGL, sorry :-(");
+        }
+    }
+
+
+    function getShader(gl, id) {
+        var shaderScript = document.getElementById(id);
+        if (!shaderScript) {
+            return null;
+        }
+
+        var str = "";
+        var k = shaderScript.firstChild;
+        while (k) {
+            if (k.nodeType == 3) {
+                str += k.textContent;
+            }
+            k = k.nextSibling;
+        }
+
+        var shader;
+        if (shaderScript.type == "x-shader/x-fragment") {
+            shader = gl.createShader(gl.FRAGMENT_SHADER);
+        } else if (shaderScript.type == "x-shader/x-vertex") {
+            shader = gl.createShader(gl.VERTEX_SHADER);
+        } else {
+            return null;
+        }
+
+        gl.shaderSource(shader, str);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            alert(gl.getShaderInfoLog(shader));
+            return null;
+        }
+
+        return shader;
+    }
+
+    // Creates a ready-to-use shader program using given fs and vs
+    function createShaderProgram(fsid, vsid, lighting, texture) {
+        var fs = getShader(gl, fsid);
+        var vs = getShader(gl, vsid);
+
+        p = gl.createProgram();
+        gl.attachShader(p, vs);
+        gl.attachShader(p, fs);
+        gl.linkProgram(p);
+
+        if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+            alert("Could not initialise shaders");
+        }
+        
+        gl.useProgram(p);
+
+        // enable vertices to be passed in at once as attributes
+        p.vertexPositionAttribute = gl.getAttribLocation(p, "aVertexPosition");
+        gl.enableVertexAttribArray(p.vertexPositionAttribute);
+
+        // enable vertex normals to be passed in at once as attributes
+        p.vertexNormalAttribute = gl.getAttribLocation(p, "aVertexNormal");
+        gl.enableVertexAttribArray(p.vertexNormalAttribute);
+
+        // Remember locations for uniform variables for matrices
+        p.pMatrixUniform = gl.getUniformLocation(p, "uPMatrix");
+        p.mvMatrixUniform = gl.getUniformLocation(p, "uMVMatrix");
+        p.nMatrixUniform = gl.getUniformLocation(p, "uNMatrix");
+
+        if(texture) {
+            p.textureCoordAttribute = gl.getAttribLocation(p, "aTextureCoord");
+            gl.enableVertexAttribArray(p.textureCoordAttribute); 
+            p.samplerUniform = gl.getUniformLocation(p, "uSampler");
+        }
+
+        return p;
+    }
+
+
+    var currentProgram;
+    var exoplanetShaderProgram;
+    var solarShaderProgram;
+    function initShaders() {
+        exoplanetShaderProgram = createShaderProgram("exoplanet-shader-fs", "exoplanet-shader-vs", texture=false);
+        solarShaderProgram = createShaderProgram("solar-shader-fs", "solar-shader-vs", texture=true);
+    }
+
+    var mvMatrix = mat4.create();
+    var mvMatrixStack = [];
+    var pMatrix = mat4.create();
+
+    function mvPushMatrix() {
+        var copy = mat4.create();
+        mat4.set(mvMatrix, copy);
+        mvMatrixStack.push(copy);
+    }
+
+    function mvPopMatrix() {
+        if (mvMatrixStack.length == 0) {
+            throw "Invalid popMatrix!";
+        }
+        mvMatrix = mvMatrixStack.pop();
+    }
+
+    function setMatrixUniforms() {
+        gl.uniformMatrix4fv(currentProgram.pMatrixUniform, false, pMatrix);
+        gl.uniformMatrix4fv(currentProgram.mvMatrixUniform, false, mvMatrix);
+
+        var normalMatrix = mat3.create();
+        mat4.toInverseMat3(mvMatrix, normalMatrix);
+        mat3.transpose(normalMatrix);
+        gl.uniformMatrix3fv(currentProgram.nMatrixUniform, false, normalMatrix);
+    }
+
+
+    function degToRad(degrees) {
+        return degrees * Math.PI / 180;
+    }
+
+
+    // Mouse events
+    var distance = -20;
+    var mouseDown = false;
+    var lastMouseX = null;
+    var lastMouseY = null;
+
+    var moonRotationMatrix = mat4.create();
+    mat4.identity(moonRotationMatrix);
+
+    function handleMouseDown(event) {
+        mouseDown = true;
+        lastMouseX = event.clientX;
+        lastMouseY = event.clientY;
+    }
+    function handleMouseUp(event) {
+        mouseDown = false;
+    }
+    function handleMouseMove(event) {
+        if (!mouseDown) {
+            return;
+        }
+        // get the vector that we just dragged (dx, dy)
+        var newX = event.clientX;
+        var newY = event.clientY;
+        var deltaX = newX - lastMouseX;
+        var deltaY = newY - lastMouseY;
+        lastMouseX = newX;
+        lastMouseY = newY;
+
+        // turn that into rotation
+        var newRotationMatrix = mat4.create();
+        mat4.identity(newRotationMatrix);
+        
+        // sensitivity
+        var sens = 0.1;
+        mat4.rotate(newRotationMatrix, degToRad(deltaX * sens), [0, 1, 0]);
+        mat4.rotate(newRotationMatrix, degToRad(deltaY * sens), [1, 0, 0]);
+        mat4.multiply(newRotationMatrix, moonRotationMatrix, moonRotationMatrix);
+    }
+
+
+    // Key events
+    var keysPressed = {}
+    var zoomFactor = 1.10;
+    function handleKeyDown(event) {
+        var char = String.fromCharCode(event.keyCode);
+        keysPressed[char] = true;
+        if(char.toLowerCase() == "w"){
+            zoom(1/zoomFactor);
+        } else if(char.toLowerCase() == "s"){
+            zoom(zoomFactor);
+        }
+    }
+    function handleKeyUp(event) {
+        keysPressed[String.fromCharCode(event.keyCode)] = false;
+    }
+    function zoom(factor){
+        distance *= factor;
+    }
+
+
+    function handleLoadedTexture(texture) {
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texture.image);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+        gl.generateMipmap(gl.TEXTURE_2D);
+
+        gl.bindTexture(gl.TEXTURE_2D, null);
+    }
+
+    function initTexture(texturePath) {
+        texture = gl.createTexture();
+        texture.image = new Image();
+        texture.image.src = texturePath;
+        return texture;
+    }
+
+    function initBody(radius, orbitRadius, texturePath) {
+        //TODO: modify according to radius
+        var latitudeBands = 30;
+        var longitudeBands = 30;
+
+        var body = {};
+        body.radius = radius;
+        body.orbitRadius = orbitRadius;
+        if(texturePath!="") body.texture = initTexture(texturePath);
+
+        var vertexPositionData = [];
+        var normalData = [];
+        var textureCoordData = [];
+        for (var latNumber=0; latNumber <= latitudeBands; latNumber++) {
+            var theta = latNumber * Math.PI / latitudeBands;
+            var sinTheta = Math.sin(theta);
+            var cosTheta = Math.cos(theta);
+
+            for (var longNumber=0; longNumber <= longitudeBands; longNumber++) {
+                var phi = longNumber * 2 * Math.PI / longitudeBands;
+                var sinPhi = Math.sin(phi);
+                var cosPhi = Math.cos(phi);
+
+                var x = cosPhi * sinTheta;
+                var y = cosTheta;
+                var z = sinPhi * sinTheta;
+                var u = 1 - (longNumber / longitudeBands);
+                var v = 1 - (latNumber / latitudeBands);
+
+                normalData.push(x);
+                normalData.push(y);
+                normalData.push(z);
+                textureCoordData.push(u);
+                textureCoordData.push(v);
+                vertexPositionData.push(body.radius * x);
+                vertexPositionData.push(body.radius * y);
+                vertexPositionData.push(body.radius * z);
+            }
+        }
+
+        var indexData = [];
+        for (var latNumber=0; latNumber < latitudeBands; latNumber++) {
+            for (var longNumber=0; longNumber < longitudeBands; longNumber++) {
+                var first = (latNumber * (longitudeBands + 1)) + longNumber;
+                var second = first + longitudeBands + 1;
+                indexData.push(first);
+                indexData.push(second);
+                indexData.push(first + 1);
+
+                indexData.push(second);
+                indexData.push(second + 1);
+                indexData.push(first + 1);
+            }
+        }
+
+        body.vertexNormalBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, body.vertexNormalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normalData), gl.STATIC_DRAW);
+        body.vertexNormalBuffer.itemSize = 3;
+        body.vertexNormalBuffer.numItems = normalData.length / 3;
+
+        body.vertexTextureCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, body.vertexTextureCoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordData), gl.STATIC_DRAW);
+        body.vertexTextureCoordBuffer.itemSize = 2;
+        body.vertexTextureCoordBuffer.numItems = textureCoordData.length / 2;
+
+        body.vertexPositionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, body.vertexPositionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPositionData), gl.STATIC_DRAW);
+        body.vertexPositionBuffer.itemSize = 3;
+        body.vertexPositionBuffer.numItems = vertexPositionData.length / 3;
+
+        body.vertexIndexBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, body.vertexIndexBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indexData), gl.STATIC_DRAW);
+        body.vertexIndexBuffer.itemSize = 1;
+        body.vertexIndexBuffer.numItems = indexData.length;
+
+        return body;
+    }
+
+    // Hack
+    function pause(milliseconds) {
+        var dt = new Date();
+        while ((new Date()) - dt <= milliseconds) { /* Do nothing */ }
+    } 
+
+    var sun;
+    var bodies = []
+    var exoplanets = []
+    function initBodies() {
+        var radiusMultiplier = 1;
+        var distanceMultiplier = 1;
+        var kmAu = 149597870; // mean distance from earth to sun in km
+        var kmSunRadius = 695500;
+        var displayedSunRadius = radiusMultiplier*kmSunRadius/kmAu;
+        sun = initBody(displayedSunRadius, 0, 'textures/sun.gif');
+        for(planet in solarsystemData) {
+            planetData = solarsystemData[planet];
+            bodies.push(
+                initBody(
+                    radius=100*radiusMultiplier*planetData['radiuse']/kmAu,
+                    orbitRadius=distanceMultiplier*planetData['au']+displayedSunRadius,
+                    texturePath=planetData['image']
+                )
+            );
+        }
+
+        var kmEarthRadius = solarsystemData['Earth']['radiuse'];
+        for(var i=0; i<exoplanetData.length; i++) {
+            var planet = exoplanetData[i];
+            exoplanets.push(
+                initBody(
+                    radius=radiusMultiplier*planet['pl_rade']*kmEarthRadius/kmAu,
+                    orbitRadius=distanceMultiplier*planet['pl_orbsmax']+displayedSunRadius,
+                    texturePath=""
+                )
+            ) 
+        }
+        alert(exoplanets.length);
+    }
+
+
+    function drawScene() {
+        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        mat4.perspective(15, gl.viewportWidth / gl.viewportHeight, 0.001, 10000.0, pMatrix);
+
+        currentProgram = solarShaderProgram;
+        gl.useProgram(currentProgram);
+        mat4.identity(mvMatrix);
+        mat4.translate(mvMatrix, [0, 0, distance]);
+        mat4.multiply(mvMatrix, moonRotationMatrix);
+        
+        for(var i=0; i<=bodies.length; i++) {
+            mvPushMatrix();
+            var body;
+            if (i==bodies.length) {
+                body = sun;
+            } else {
+                body = bodies[i];
+            }
+            mat4.rotate(mvMatrix, degToRad(5), [0,1,0]);
+            mat4.translate(mvMatrix, [body.orbitRadius, 0, 0]);
+
+            handleLoadedTexture(body.texture);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, body.texture);
+            gl.uniform1i(currentProgram.samplerUniform, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, body.vertexPositionBuffer);
+            gl.vertexAttribPointer(currentProgram.vertexPositionAttribute, body.vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, body.vertexTextureCoordBuffer);
+            gl.vertexAttribPointer(currentProgram.textureCoordAttribute, body.vertexTextureCoordBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, body.vertexNormalBuffer);
+            gl.vertexAttribPointer(currentProgram.vertexNormalAttribute, body.vertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, body.vertexIndexBuffer);
+            setMatrixUniforms();
+            gl.drawElements(gl.TRIANGLES, body.vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+            gl.bindTexture(gl.TEXTURE_2D, null);
+
+            mvPopMatrix();
+        }
+        
+        // Draw exoplanets
+        var planetRotationMatrix = mat4.create();
+        mat4.identity(planetRotationMatrix);
+        
+        currentProgram = exoplanetShaderProgram;
+        gl.useProgram(currentProgram);
+        for(var i=0; i<exoplanets.length; i++) {
+            mvPushMatrix();
+            mat4.rotate(mvMatrix, degToRad(10*i), [0,1,0]);
+            mat4.translate(mvMatrix, [exoplanets[i].orbitRadius, 0, 0]);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, exoplanets[i].vertexPositionBuffer);
+            gl.vertexAttribPointer(currentProgram.vertexPositionAttribute, exoplanets[i].vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, exoplanets[i].vertexNormalBuffer);
+            gl.vertexAttribPointer(currentProgram.vertexNormalAttribute, exoplanets[i].vertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, exoplanets[i].vertexIndexBuffer);
+            setMatrixUniforms();
+            gl.drawElements(gl.TRIANGLES, exoplanets[i].vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+
+            mvPopMatrix();
+        } 
+    }
+
+
+    function tick() {
+        requestAnimFrame(tick);
+        drawScene();
+    }
+
+
+    function webGLStart() {
+        var canvas = document.getElementById("space");
+        initGL(canvas);
+        initShaders();
+        initBodies();
+
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        gl.enable(gl.DEPTH_TEST);
+
+        canvas.onmousedown = handleMouseDown;
+        document.onmouseup = handleMouseUp;
+        document.onmousemove = handleMouseMove;
+        document.onkeydown = handleKeyDown;
+        document.onkeyup = handleKeyUp;
+
+        tick();
+    }
+
+    $(document).ready(function() {
+        $.getJSON('solarsystem.json', function(sd) {
+            solarsystemData = sd;
+            $.getJSON('exoplanets_with_radii.json', function(ed) {
+                exoplanetData = ed;
+                webGLStart();
+            });
+        });
+    });
+
+</script>
+
+
+</head>
+
+
+<body>
+    <a href="http://learningwebgl.com/blog/?p=1253">&lt;&lt; Back to Lesson 11</a><br />
+
+    <canvas id="space" width="1024" height="512"></canvas>
+    <br/>
+
+    <input type="checkbox" id="lighting" checked /> Use lighting<br/>
+    Spin the moon by dragging it with the mouse.
+    <br/>
+
+    <h2>Directional light:</h2>
+
+    <table style="border: 0; padding: 10px;">
+        <tr>
+            <td><b>Direction:</b>
+            <td>X: <input type="text" id="lightDirectionX" value="-1.0" />
+            <td>Y: <input type="text" id="lightDirectionY" value="-1.0" />
+            <td>Z: <input type="text" id="lightDirectionZ" value="-1.0" />
+        </tr>
+        <tr>
+            <td><b>Colour:</b>
+            <td>R: <input type="text" id="directionalR" value="0.8" />
+            <td>G: <input type="text" id="directionalG" value="0.8" />
+            <td>B: <input type="text" id="directionalB" value="0.8" />
+        </tr>
+    </table>
+
+
+    <h2>Ambient light:</h2>
+
+    <table style="border: 0; padding: 10px;">
+        <tr>
+            <td><b>Colour:</b>
+            <td>R: <input type="text" id="ambientR" value="0.2" />
+            <td>G: <input type="text" id="ambientG" value="0.2" />
+            <td>B: <input type="text" id="ambientB" value="0.2" />
+        </tr>
+    </table>
+    <br/>
+
+    Moon texture courtesy of <a href="http://maps.jpl.nasa.gov/">the Jet Propulsion Laboratory</a>.
+    <br/>
+    <br/>
+
+    <a href="http://learningwebgl.com/blog/?p=1253">&lt;&lt; Back to Lesson 11</a><br />
+</body>
+
+</html>
