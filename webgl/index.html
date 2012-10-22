@@ -549,8 +549,7 @@
     var sun;
     var bodies;
     var exoplanets;
-    function initBodies(radiusMultiplier) {
-        var scaleOnlySolar = $('#scale-only-solarsystem-checkbox').is(':checked');
+    function initBodies() {
         bodies = [];
         exoplanets = [];
         var distanceMultiplier = 1.;
@@ -565,7 +564,7 @@
             bodies.push(
                 initBody(
                     planet, // name
-                    radiusMultiplier*planetData['radiuse']/kmAu, //radius
+                    planetData['radiuse']/kmAu, //radius
                     5.0,
                     0.0,
                     distanceMultiplier*planetData['au']+displayedSunRadius, // orb radius
@@ -578,13 +577,12 @@
         var azith = 0.0; //TODO: actual physical azith/elev instead of a spiral?
         var kmEarthRadius = solarsystemData['Earth']['radiuse'];
         var temperatureMinMax = getTemperatureEstimateMinMax(exoplanetData);
-        var exoplanetRadiusMultiplier = scaleOnlySolar ? 1. : radiusMultiplier;
         for(var i=0; i<exoplanetData.length; i++) {
             var planet = exoplanetData[i];
             exoplanets.push(
                 initBody(
                     planet['pl_hostname']+planet['pl_letter'], //name
-                    exoplanetRadiusMultiplier*planet['pl_rade']*kmEarthRadius/kmAu, //radius
+                    1.*planet['pl_rade']*kmEarthRadius/kmAu, //radius
                     azith,
                     0.0, 
                     distanceMultiplier*planet['pl_orbsmax']+displayedSunRadius, //orbit radius
@@ -651,6 +649,8 @@
 
     // Draws everything - called per frame
     function drawScene() {
+        var scaleOnlySolar = $('#scale-only-solarsystem-checkbox').is(':checked');
+        var radiusMultiplier = $('#radius-multiplier-slider').slider("value");
         currentProgram = exoplanetShaderProgram;
         gl.useProgram(currentProgram);
 
@@ -658,11 +658,13 @@
         gl.uniform3f(currentProgram.lightPosition, -10., 0., 0.);
 
         for(var i=0; i<=bodies.length; i++) {
+            var scale = radiusMultiplier;
             mvPushMatrix();
             var body;
             if (i==bodies.length) {
                 body = sun;
                 gl.uniform1i(currentProgram.lightingFlag, 0);
+                scale = 1.;
             } else {
                 body = bodies[i];
                 gl.uniform1i(currentProgram.lightingFlag, 1);
@@ -670,6 +672,7 @@
             mat4.rotate(mvMatrix, degToRad(body.azith), [0,1,0]);
             mat4.rotate(mvMatrix, degToRad(body.elev), [1,0,0]);
             mat4.translate(mvMatrix, [0, 0, body.orbitRadius]);
+            mat4.scale(mvMatrix, [scale, scale, scale]);
 
             handleLoadedTexture(body.texture);
             gl.activeTexture(gl.TEXTURE0);
@@ -709,11 +712,13 @@
         }
         
         // Draw exoplanets
+        var scale = scaleOnlySolar ? 1. : radiusMultiplier;
         for(var i=0; i<exoplanets.length; i++) {
             mvPushMatrix();
             mat4.rotate(mvMatrix, degToRad(exoplanets[i].azith), [0,1,0]);
             mat4.rotate(mvMatrix, degToRad(exoplanets[i].elev), [1,0,0]);
             mat4.translate(mvMatrix, [0, 0, (exoplanets[i].orbitRadius)]);
+            mat4.scale(mvMatrix, [scale, scale, scale]);
             
             // Turn off texturing
             gl.uniform1i(currentProgram.textureFlag, 0);
@@ -755,7 +760,7 @@
         var canvas = document.getElementById("space");
         initGL(canvas);
         initShaders();
-        initBodies(1.);
+        initBodies();
 
         gl.clearColor(0.0, 0.0, 0.0, 1.0);
         gl.enable(gl.DEPTH_TEST);
@@ -786,23 +791,33 @@
         });
 
         // Let user define radius scale, default to 1, the minimum.
-        $('#radius-multiplier-slider').slider({
+        var rslider = $('#radius-multiplier-slider');
+        var rvalue = $('#radius-multiplier-value');
+        rslider.slider({
             range: "min",
             min: 1,
             max: 50,
             value: 1,
             slide: function(event, ui) {
-                $('#radius-multiplier-value').val(ui.value);
-                initBodies(ui.value);
+                rvalue.val(ui.value);
             }
         });
-        $('#radius-multiplier-value').val($('#radius-multiplier-slider').slider("value"));
+        rvalue.val(rslider.slider("value"));
+        rvalue.change(function() {
+            var value = rvalue.val();
+            if(value < 1) value = 1;
+            else if(value > 50) value = 50;
+            rvalue.val(value);
+            if(value != rslider.slider("value")) {
+                rslider.slider("value", value);
+            }
+        });
+        
 
         // Let the user scale solar planets only
         $('#scale-only-solarsystem-checkbox').click(function() {
             var currentScale = $('#radius-multiplier-slider').slider("value");
             if(currentScale > 1) {
-                initBodies(currentScale);
             }
         });
     });
