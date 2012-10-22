@@ -19,7 +19,8 @@
     precision mediump float;
 
     // Use texture
-    uniform int texture;
+    uniform int textureFlag;
+    uniform int lightingFlag;
     uniform sampler2D textureSampler;
 
     // These are the input params per fragment,
@@ -27,31 +28,40 @@
     varying vec3 eyePosition;
     varying vec3 normal;
     varying vec2 textureCoord; // texture coords
+    varying vec3 lightPosition; // position of light in camera pos
+
+    vec3 getMaterialColor() {
+        if(textureFlag==1) {
+            vec4 textureColor = texture2D(textureSampler, vec2(textureCoord.s, textureCoord.t));
+            return textureColor.rgb;
+        } else {
+            return vec3(0.8, 0.5, 0.5);
+        }
+    }
 
     void main(void) {
+        // TODO: pass in instead of hard-coding
+        // diffuse, ambient, and specular materials
+        vec3 Kd = getMaterialColor();
+
+        if(lightingFlag==0) {
+            gl_FragColor = vec4(Kd, 1.);
+            return;
+        }
+        
         // light source (hardcoded for now)
-        vec3 lightSourcePosition = vec3(0., 0., 0.);
         vec3 lightColor = vec3(1., 1., 1.);
 
         // Normalized normal
         vec3 N = normalize(normal);
 
         // point light from (0,0,0), which is where the camera is always
-        vec3 L = normalize(lightSourcePosition - eyePosition);
+        vec3 L = normalize(lightPosition - eyePosition);
         vec3 V = normalize(-eyePosition);
         vec3 R = normalize(reflect(-L, N));
 
-        // TODO: pass in instead of hard-coding
-        // diffuse, ambient, and specular materials
-        vec3 Kd, Ks, Ka;
-        if(texture==1) {
-            vec4 textureColor = texture2D(textureSampler, vec2(textureCoord.s, textureCoord.t));
-            Kd = textureColor.rgb;
-        } else {
-            Kd = vec3(0.8, 0.5, 0.5);
-        }
-        Ks = vec3(1, 1, 1);
-        Ka = vec3(0.2, 0.2, 0.2);
+        vec3 Ks = vec3(1, 1, 1);
+        vec3 Ka = vec3(0.2, 0.2, 0.2);
 
         // compute the diffuse color coefficient
         float Rd = max(0., dot(L, N));
@@ -78,12 +88,15 @@
     uniform mat4 uPMatrix;
     uniform mat3 uNMatrix;
 
+    uniform vec3 uLightPosition;
+
     // These are the output values for the shader, to be
     // interpolated across vertices and passed in per fragment
     // to the fragment shader
     varying vec3 eyePosition; // pos of vertex in eye (camera) space
     varying vec3 normal; // normal at vertex
     varying vec2 textureCoord;
+    varying vec3 lightPosition;
 
     void main(void) {
         // Transform vertex to get eye-space position of vertex
@@ -95,6 +108,9 @@
 
         // Just copy texture coords
         textureCoord = vertexTextureCoord;
+
+        // Transform light position into eye space
+        lightPosition = (uMVMatrix*vec4(uLightPosition, 1)).xyz;
         
         // Transform again to get clip-space coordinates via the
         // projection matrix. The gl_Position variable tells webGL
@@ -220,11 +236,18 @@
         p.mvMatrixUniform = gl.getUniformLocation(p, "uMVMatrix");
         p.nMatrixUniform = gl.getUniformLocation(p, "uNMatrix");
 
+        // texture coordinates as attributes
         p.textureCoordAttribute = gl.getAttribLocation(p, "vertexTextureCoord");
         gl.enableVertexAttribArray(p.textureCoordAttribute); 
-        
+       
+        // texture uniforms
         p.samplerUniform = gl.getUniformLocation(p, "textureSampler");
-        p.textureFlag = gl.getUniformLocation(p, "texture");
+        p.textureFlag = gl.getUniformLocation(p, "textureFlag");
+        
+        // lighting uniforms
+        p.lightingFlag = gl.getUniformLocation(p, "lightingFlag");
+        p.lightPosition = gl.getUniformLocation(p, "uLightPosition");
+
 
         return p;
     }
@@ -232,10 +255,8 @@
 
     var currentProgram;
     var exoplanetShaderProgram;
-    var solarShaderProgram;
     function initShaders() {
         exoplanetShaderProgram = createShaderProgram("exoplanet-shader-fs", "exoplanet-shader-vs");
-        solarShaderProgram = createShaderProgram("solar-shader-fs", "solar-shader-vs");
     }
 
     var mvMatrix = mat4.create();
@@ -539,14 +560,19 @@
     function drawScene() {
         currentProgram = exoplanetShaderProgram;
         gl.useProgram(currentProgram);
+
+        // Pass in light info
+        gl.uniform3f(currentProgram.lightPosition, -10., 0., 0.);
         
         for(var i=0; i<=bodies.length; i++) {
             mvPushMatrix();
             var body;
             if (i==bodies.length) {
                 body = sun;
+                gl.uniform1i(currentProgram.lightingFlag, 0);
             } else {
                 body = bodies[i];
+                gl.uniform1i(currentProgram.lightingFlag, 1);
             }
             mat4.rotate(mvMatrix, degToRad(body.azith), [0,1,0]);
             mat4.rotate(mvMatrix, degToRad(body.elev), [1,0,0]);
@@ -585,7 +611,10 @@
             mat4.translate(mvMatrix, [exoplanets[i].orbitRadius, 0, 0]);
             
             // Turn off texturing
-            gl.uniform1i(currentProgram.textureFlag, 1);
+            gl.uniform1i(currentProgram.textureFlag, 0);
+
+            // Turn on lighting
+            gl.uniform1i(currentProgram.lightingFlag, 1);
 
             gl.bindBuffer(gl.ARRAY_BUFFER, exoplanets[i].vertexPositionBuffer);
             gl.vertexAttribPointer(currentProgram.vertexPositionAttribute, exoplanets[i].vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
