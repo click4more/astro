@@ -1,16 +1,155 @@
 <html>
 
 <head>
-<title>Learning WebGL &mdash; lesson 11</title>
+<title>Alien Planets by Dan Posch and Jiwon Kim</title>
 <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
 
+<link href='http://fonts.googleapis.com/css?family=Titillium+Web:400,300,600' rel='stylesheet' type='text/css'>
 <style type="text/css">
+body {
+}
+
+canvas {
+    display: block;
+    clear: left;
+}
+
+label {
+    font-family: 'Tahoma', sans-serif;
+    font-size: 10px;
+}
+.zoom-control {
+    list-style-type: none;
+}
+
+.zoom-control li {
+    float: left;
+    margin: 0;
+    padding: 0;
+    height: 60px;
+    background: url('images/planets.png') no-repeat left top;
+}
+
+.zoom-control .ui-selecting {
+    background: url('images/planets-selected.png') no-repeat left top;
+}
+
+li#Sun {
+    width: 50px;
+}
+
+li#Mercury {
+    width: 25px; 
+    background-position: -48px 0px;
+}
+
+li#Venus {
+    width: 35px; 
+    background-position: -75px 0px;
+}
+
+li#Earth {
+    width: 35px; 
+    background-position: -115px 0px;
+}
+
+li#Mars {
+    width: 35px; 
+    background-position: -150px 0px;
+}
+
+li#Jupiter {
+    width: 65px; 
+    background-position: -185px 0px;
+}
+
+li#Saturn {
+    width: 80px; 
+    background-position: -250px 0px;
+}
+
+li#Uranus {
+    width: 28px; 
+    background-position: -330px 0px;
+}
+
+li#Neptune {
+    width: 35px; 
+    background-position: -362px 0px;
+}
+#title {
+    font-family: 'Titillium Web', sans-serif;
+    width: 360px;
+    float: left;
+}
+
+#title h1 {
+    font-weight: 600;
+    font-size: 20pt;
+    margin-bottom: -10px;
+}
+
+#title h2 {
+    font-weight: 300;
+    font-size: 12pt;
+    letter-spacing: 2px;
+}
+
+#title p {
+    font-family: 'Tahoma', sans-serif;
+    font-size: 9pt;
+}
+
+#title a {
+    color: #444;
+}
+
+#title a:hover {
+    color: #3366FF;
+}
+
+#zoom-and-scale-controls {
+    float: left;
+}
+
+#zoom-and-scale-controls label {
+}
+
 #space {
     border: none;
 }
 
+#radius-multiplier {
+    margin-top: 55px;
+    margin-left: 50px;
+}
+
+
 #radius-multiplier-slider {
     width: 200px;
+    display: inline-block;
+    float: left;
+    margin-left: 10px;
+    clear: right;
+}
+
+#radius-multiplier-value {
+    border: none;
+    color: #f6931f;
+    font-weight: bold;
+    width: 25px;
+    float: left;
+    margin-left: 5px;
+}
+
+#radius-multiplier-label {
+    float: left;
+}
+
+#scale-only-solarsystem-label {
+}
+
+#scale-only-solarsystem-checkbox {
 }
 </style>
 
@@ -19,6 +158,28 @@
 <script src="http://code.jquery.com/ui/1.9.0/jquery-ui.js"></script>
 <script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
 <script type="text/javascript" src="webgl-utils.js"></script>
+
+<!-- line shaders --!>
+<script id="line-shader-fs" type="x-shader/x-fragment">
+    precision mediump float;
+
+    void main() {
+        gl_FragColor = vec4(1.,1.,1.,1.);
+    }
+</script>
+
+<script id="line-shader-vs" type="x-shader/x-vertex">
+    precision mediump float;
+
+    attribute vec3 vertexPosition; 
+
+    uniform mat4 uPMatrix;
+    uniform mat4 uMVMatrix;
+
+    void main() {
+        gl_Position = uPMatrix * uMVMatrix * vec4(vertexPosition, 1.0);
+    }
+</script>
 
 <!-- exoplanet shaders --!>
 <script id="exoplanet-shader-fs" type="x-shader/x-fragment">
@@ -127,38 +288,6 @@
     }
 </script>
 
-<!-- solar shaders --!>
-<script id="solar-shader-fs" type="x-shader/x-fragment">
-    precision mediump float;
-
-    varying vec2 textureCoord;
-
-    uniform sampler2D uSampler;
-
-    void main(void) {
-        vec4 textureColor = texture2D(uSampler, vec2(textureCoord.s, textureCoord.t));
-        gl_FragColor = vec4(textureColor.rgb, textureColor.a);
-    }
-</script>
-
-<script id="solar-shader-vs" type="x-shader/x-vertex">
-    attribute vec3 vertexPosition;
-    attribute vec3 vertexNormal;
-    attribute vec2 vertexTextureCoord;
-
-    uniform mat4 uMVMatrix;
-    uniform mat4 uPMatrix;
-    uniform mat3 uNMatrix;
-
-    varying vec2 textureCoord;
-
-    void main(void) {
-        gl_Position = uPMatrix * uMVMatrix * vec4(vertexPosition, 1.0);
-        textureCoord = vertexTextureCoord;
-    }
-</script>
-
-
 <script type="text/javascript">
     
     var solarsystemData;
@@ -215,7 +344,7 @@
     }
 
     // Creates a ready-to-use shader program using given fs and vs
-    function createShaderProgram(fsid, vsid) {
+    function createShaderProgram(fsid, vsid, isLineShader) {
         var fs = getShader(gl, fsid);
         var vs = getShader(gl, vsid);
 
@@ -233,28 +362,32 @@
         // enable vertices to be passed in at once as attributes
         p.vertexPositionAttribute = gl.getAttribLocation(p, "vertexPosition");
         gl.enableVertexAttribArray(p.vertexPositionAttribute);
-
-        // enable vertex normals to be passed in at once as attributes
-        p.vertexNormalAttribute = gl.getAttribLocation(p, "vertexNormal");
-        gl.enableVertexAttribArray(p.vertexNormalAttribute);
-
+        
         // Remember locations for uniform variables for matrices
         p.pMatrixUniform = gl.getUniformLocation(p, "uPMatrix");
         p.mvMatrixUniform = gl.getUniformLocation(p, "uMVMatrix");
-        p.nMatrixUniform = gl.getUniformLocation(p, "uNMatrix");
 
-        // texture coordinates as attributes
-        p.textureCoordAttribute = gl.getAttribLocation(p, "vertexTextureCoord");
-        gl.enableVertexAttribArray(p.textureCoordAttribute); 
-       
-        // texture uniforms
-        p.samplerUniform = gl.getUniformLocation(p, "textureSampler");
-        p.textureFlag = gl.getUniformLocation(p, "textureFlag");
-        
-        // lighting uniforms
-        p.lightingFlag = gl.getUniformLocation(p, "lightingFlag");
-        p.lightPosition = gl.getUniformLocation(p, "uLightPosition");
-        p.exoplanetColor = gl.getUniformLocation(p, "exoplanetColor");
+        if(!isLineShader) {
+            // enable vertex normals to be passed in at once as attributes
+            p.vertexNormalAttribute = gl.getAttribLocation(p, "vertexNormal");
+            gl.enableVertexAttribArray(p.vertexNormalAttribute);
+            
+            // normal matrix
+            p.nMatrixUniform = gl.getUniformLocation(p, "uNMatrix");
+            
+            // texture coordinates as attributes
+            p.textureCoordAttribute = gl.getAttribLocation(p, "vertexTextureCoord");
+            gl.enableVertexAttribArray(p.textureCoordAttribute); 
+           
+            // texture uniforms
+            p.samplerUniform = gl.getUniformLocation(p, "textureSampler");
+            p.textureFlag = gl.getUniformLocation(p, "textureFlag");
+            
+            // lighting uniforms
+            p.lightingFlag = gl.getUniformLocation(p, "lightingFlag");
+            p.lightPosition = gl.getUniformLocation(p, "uLightPosition");
+            p.exoplanetColor = gl.getUniformLocation(p, "exoplanetColor");
+        }
 
         return p;
     }
@@ -262,8 +395,10 @@
 
     var currentProgram;
     var exoplanetShaderProgram;
+    var lineShaderProgram;
     function initShaders() {
-        exoplanetShaderProgram = createShaderProgram("exoplanet-shader-fs", "exoplanet-shader-vs");
+        exoplanetShaderProgram = createShaderProgram("exoplanet-shader-fs", "exoplanet-shader-vs", false);
+        lineShaderProgram = createShaderProgram("line-shader-fs", "line-shader-vs", true);
     }
 
     var mvMatrix = mat4.create();
@@ -328,7 +463,7 @@
         lastMouseY = newY;
 
         // turn that into rotation
-        var sens = 0.05; //sensitivity
+        var sens = 1./(distance*distance*500); //sensitivity
         azith -= deltaX * sens;
         elev -= deltaY * sens * 0.7;
     }
@@ -452,22 +587,6 @@
         // save for lookup
         allBodies[name] = body;
 
-        var bandVertexPositionData = [];
-        for (var i=0; i<30; i++) {
-            var theta = degToRad(i*30/360);
-            var x = Math.cos(theta)*body.radius;
-            var z = Math.sin(theta)*body.radius;
-            bandVertexPositionData.push(x);
-            bandVertexPositionData.push(0);
-            bandVertexPositionData.push(z);
-        }
-
-        body.bandVertexPositionBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, body.bandVertexPositionBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(bandVertexPositionData), gl.STATIC_DRAW);
-        body.bandVertexPositionBuffer.itemSize = 3;
-        body.bandVertexPositionBuffer.numItems = bandVertexPositionData.length / 3;
-
         var vertexPositionData = [];
         var normalData = [];
         var textureCoordData = [];
@@ -540,12 +659,6 @@
         return body;
     }
 
-    // Hack
-    function pause(milliseconds) {
-        var dt = new Date();
-        while ((new Date()) - dt <= milliseconds) { /* Do nothing */ }
-    } 
-
     var sun;
     var bodies;
     var exoplanets;
@@ -596,9 +709,13 @@
 
     var planetZoomTarget = null, planetZoomT = 0.0;
     function handlePlanetZoom() {
-        if(!planetZoomTarget) {
+        var selected = $('.ui-selected');
+
+        if(!selected.exists()) {
             return;
         }
+        
+        planetZoomTarget = selected.attr("id");
 
         // start animation
         if(planetZoomT == 0){
@@ -606,9 +723,10 @@
             var azith0 = azith;
             while(azith0 > body.azith) azith0 -= 360.0;
             if(body.azith - azith0 > 180.0) azith0 += 360;
+            radiusMultiplier = body.name=="Sun" ? 1. : $('#radius-multiplier-slider').slider("value");
             planetZoomPoints = [
                 {r:Math.abs(distance), elev:elev, azith:azith0},
-                {r:body.orbitRadius + body.radius*50, elev:body.elev, azith:body.azith}
+                {r:body.orbitRadius + body.radius*radiusMultiplier*20, elev:body.elev, azith:body.azith}
             ];
         }
 
@@ -627,6 +745,7 @@
         if(planetZoomT == 1.0){
             planetZoomT = 0.0;
             planetZoomTarget = 0.0;
+            selected.removeClass('ui-selected');
         } else {
             // advance the animation
             planetZoomT += 1/30;
@@ -640,7 +759,7 @@
         gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        mat4.perspective(30, gl.viewportWidth / gl.viewportHeight, 0.001, 10000.0, pMatrix);
+        mat4.perspective(30, gl.viewportWidth / gl.viewportHeight, 0.0001, 10000.0, pMatrix);
         mat4.identity(mvMatrix);
         mat4.translate(mvMatrix, [0, 0, -distance]);
         mat4.rotate(mvMatrix, -degToRad(elev), [1, 0, 0]);
@@ -694,17 +813,6 @@
             gl.drawElements(gl.TRIANGLES, body.vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
             gl.bindTexture(gl.TEXTURE_2D, null);
 
-            mvPopMatrix();
-            
-            mvPushMatrix();
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, body.texture);
-            gl.uniform1i(currentProgram.samplerUniform, 0);
-            gl.uniform1i(currentProgram.textureFlag, 1);
-            gl.bindBuffer(gl.ARRAY_BUFFER, body.bandVertexPositionBuffer);
-            setMatrixUniforms();
-            gl.drawArrays(gl.LINE_LOOP, 0, body.bandVertexPositionBuffer.numItems); 
-            gl.bindTexture(gl.TEXTURE_2D, null);
             mvPopMatrix();
 
             var cameraPos = [0,0,0];
@@ -773,6 +881,10 @@
 
         tick();
     }
+    
+    $.fn.exists = function () {
+        return this.length !== 0;
+    }
 
     $(document).ready(function() {
         
@@ -786,9 +898,14 @@
         });
     
         // Make zoom available
+        /*
         $('.zoom').click(function() {
+            console.log("clicked!");
             planetZoomTarget = $(this).attr('id');
         });
+        */
+
+        $('.zoom-control').selectable();
 
         // Let user define radius scale, default to 1, the minimum.
         var rslider = $('#radius-multiplier-slider');
@@ -820,6 +937,7 @@
             if(currentScale > 1) {
             }
         });
+
     });
 
 </script>
@@ -829,23 +947,46 @@
 
 
 <body>
+    <div id="top">
+        <div id="title">
+            <h1>Alien Planets</h1>
+            <h2>by <a href="http://dcpos.ch">Dan Posch</a> and <a href="http://jiwonk.im">Jiwon Kim</a></h2> 
+            <p>
+                You are looking at our sun and its planets, along with confirmed extrasolar planets that have radii and orbit data that is included in the solar system for perspective. The radii and distances are accurately scaled (relatively, of course), but you can increase the radii for a better view of the planets.
+            </p> 
+            <p>
+                Use 'w' to zoom in, 'e' to do it faster. Use 's' to zoom out, 'd' to do it faster. Fiddle with the controls to change what you're looking at.
+            </p>
+        </div>
+        <div id="zoom-and-scale-controls">
+            <label for="zoom-control">Zoom: </label>
+            <ul class="zoom-control">
+                <li class="zoom" id="Sun"></li>
+                <li class="zoom" id="Mercury"></li>
+                <li class="zoom" id="Venus"></li>
+                <li class="zoom" id="Earth"></li>
+                <li class="zoom" id="Mars"></li>
+                <li class="zoom" id="Jupiter"></li>
+                <li class="zoom" id="Saturn"></li>
+                <li class="zoom" id="Uranus"></li>
+                <li class="zoom" id="Neptune"></li>
+            </ul>
+            <br />
+            <div id="radius-multiplier">
+                <label id="radius-multiplier-label" for="radius-multiplier-slider">Scale Radius:</label>
+                <input type="text" id="radius-multiplier-value" />
+                <div id="radius-multiplier-slider"></div>
+                <br />
+                <label id ="scale-only-solarsystem-label" for="scale-only-solarsystem-checkbox">Scale only solar system planets</label>
+                <input type="checkbox" id="scale-only-solarsystem-checkbox" />
+            </div>
+        </div>
+    </div>
+    
+    <br />
     <canvas id="space" width="800" height="400"></canvas>
     <br/>
 
-    <button id="Earth" class="zoom">Earth</button>
-    <button id="Mercury" class="zoom">Mercury</button>
-    <button id="Venus" class="zoom">Venus</button>
-    <button id="Mars" class="zoom">Mars</button>
-    <button id="Jupiter" class="zoom">Jupiter</button>
-    <button id="Saturn" class="zoom">Saturn</button>
-    <button id="Uranus" class="zoom">Uranus</button>
-    <button id="Pluto" class="zoom">Pluto</button>
-    <br />
-    <label for="radius-multiplier-value">Scale Radius:</label>
-    <input type="text" id="radius-multiplier-value" style="border: 0; color: #f6931f; font-weight: bold;" />
-    <label for="scale-only-solarsystem-checkbox">Scale only solar system planets</label>
-    <input type="checkbox" id="scale-only-solarsystem-checkbox" />
-    <div id="radius-multiplier-slider"></div>
     <br/>
     <br/>
 </body>
