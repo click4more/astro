@@ -1,0 +1,42 @@
+#space-d3 {
+    display: block;
+    clear: left;
+    background-color: #000;
+    width: 800px;
+    height: 400px;
+}
+
+.planet {
+}
+
+.solar {
+    fill: #04B4AE;
+    stroke-width: 2px;
+    stroke: #0B4C5F;
+}
+
+.extrasolar {
+    fill: rgba(255, 255, 255, 0.1);
+    stroke-width: 1px;
+    stroke: rgba(200, 200, 200, 0.8);
+}
+
+.solar-orbit {
+    fill: none;
+    stroke-width: 2px;
+    stroke: #aaa;
+}
+
+.exo-orbit {
+    fill: none;
+    stroke-width: 1px;
+    stroke: rgba(255, 255, 255, 0.1);
+}
+
+.selected-orbit {
+    fill: none;
+    stroke-width: 3px;
+    stroke: #0f0;
+}
+
+

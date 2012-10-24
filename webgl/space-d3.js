@@ -34,7 +34,7 @@ spaceD3.highlightSelectedPlanetOrbit = function(x, h) {
     };
 
     // TODO: if selected orbit is not visible, then decrease distance as appropriate
-    spaceD3.drawCircles([solarsystemData[selectedId]], 0, h/2, rf, ".selected-orbit", "selected-orbit");
+    spaceD3.drawCircles([spaceD3.solarsystemData[selectedId]], 0, h/2, rf, ".selected-orbit", "selected-orbit");
 
 }
 
@@ -54,25 +54,25 @@ spaceD3.drawScene = function() {
     rf = function(d) {
         return x(parseFloat(d['pl_orbsmax']));
     };
-    spaceD3.drawCircles(exoplanetData, 0, h/2, rf, ".exo-orbit", "exo-orbit");
+    spaceD3.drawCircles(spaceD3.exoplanetData, 0, h/2, rf, ".exo-orbit", "exo-orbit");
     
     // draw solar orbits
     var xf, yf, rf;
     rf = function(d) {
         return x(d['au']);
     };
-    spaceD3.drawCircles(solarData, 0, h/2, rf, ".solar-orbit", "solar-orbit");
+    spaceD3.drawCircles(spaceD3.solarData, 0, h/2, rf, ".solar-orbit", "solar-orbit");
     
     // draw the exoplanets
     xf = function(d) {
         var pd = x(parseFloat(d['pl_orbsmax']));
         return pd;
     };
-    var kmEarthRadius = solarsystemData['Earth']['radiuse'];
+    var kmEarthRadius = spaceD3.solarsystemData['Earth']['radiuse'];
     rf = function(d) {
         return r(parseFloat(d['pl_rade'])*kmEarthRadius);
     };
-    spaceD3.drawCircles(exoplanetData, xf, h/2, rf, ".planet.extrasolar", "planet extrasolar");
+    spaceD3.drawCircles(spaceD3.exoplanetData, xf, h/2, rf, ".planet.extrasolar", "planet extrasolar");
     
     // Vertical line for selected planet
     spaceD3.highlightSelectedPlanetOrbit(x, h);
@@ -84,17 +84,18 @@ spaceD3.drawScene = function() {
     rf = function(d) {
         return r(d['radiuse']);
     };
-    spaceD3.drawCircles(solarData, xf, h/2, rf, ".planet.solar", "planet solar");
+    spaceD3.drawCircles(spaceD3.solarData, xf, h/2, rf, ".planet.solar", "planet solar");
 
 }
 
-var svg;
-var solarData;
-spaceD3.start = function() {
+spaceD3.start = function(solarsystemData, exoplanetData) {
+    spaceD3.solarsystemData = solarsystemData;
+    spaceD3.exoplanetData = exoplanetData;
+
     // Clean data for appropriate use with d3
-    solarData = []
-    for(planetName in solarsystemData) {
-        solarData.push(solarsystemData[planetName]);
+    spaceD3.solarData = []
+    for(planetName in spaceD3.solarsystemData) {
+        spaceD3.solarData.push(spaceD3.solarsystemData[planetName]);
     }
 
     svg = d3.select("body")
