@@ -65,6 +65,27 @@ function drawScene(gl){
     gl.drawArrays(gl.POINTS, 0, bufStars.numElems);
 }
 
+function wireCameraControls(gl, sel){
+    var lastX, lastY;
+    var isDown = false;
+    sel.mousedown(function(e){
+        isDown = true;
+    });         
+    sel.mouseup(function(e){
+        isDown = false;
+    });         
+    sel.mousemove(function(e){
+        if(isDown){
+            var sens = 0.01;
+            gl.camera.azith += (e.pageX - lastX)*sens;    
+            gl.camera.elev += (e.pageY - lastY)*sens;    
+            gl.camera.elev = Math.max(-80, Math.min(80, gl.camera.elev));
+        }
+        lastX = e.pageX;
+        lastY = e.pageY;
+    });
+}
+
 
 $(function(){
     // create gl
@@ -80,14 +101,13 @@ $(function(){
     }
     gl.buffers.stars = DCGL.createBuffer(arrStars, 3, gl);
 
-    // add handlers
-    $("#sky").mousedown(function(e){ onMouseDown(e, gl); });
-    $("#sky").mouseup(function(e){ onMouseUp(e, gl); });
-
     //animate
     DCGL.animate(function(){
         drawScene(gl);
     }, canvas);
+
+    // wire controls
+    wireCameraControls(gl, $("#sky")); 
 });
 </script>
 
