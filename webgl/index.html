@@ -139,7 +139,7 @@
             $.getJSON('exoplanets_with_radii.json', function(ed) {
                 exoplanetData = ed;
                 spaceWebGL.webGLStart(sd, ed);
-                spaceD3.start(sd, ed);
+                spaceD3.start(sd, ed, spaceWebGL.allBodies);
             });
         });
 
@@ -178,7 +178,7 @@
         dslider.slider({
             range: "min",
             min: 1,
-            max: 2000,
+            max: 5000,
             value: 19,
             slide: function(event, ui) {
                 dvalue.val(ui.value);

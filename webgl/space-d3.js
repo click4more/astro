@@ -1,19 +1,27 @@
 var spaceD3 = window.spaceD3 = {};
 
-spaceD3.drawCircles = function(data, cx, cy, cr, selector, classname) {
+spaceD3.drawCircles = function(data, cx, cy, cr, cs, cf, selector, classname) {
     // first clear
     svg.selectAll(selector).remove();
 
     // draw orbits for solar system planets
-    var solarorbits = svg.selectAll(selector)
+    var circles = svg.selectAll(selector)
         .data(data)
         .enter()
         .append("circle")
-        .attr("class", classname);
+        .attr("class", classname)
 
-    solarorbits.attr("cx", cx)
+    circles.attr("cx", cx)
         .attr("cy", cy)
         .attr("r", cr);
+
+    if(cs) {
+        circles.attr("stroke", cs);
+    }
+    
+    if(cf) {
+        circles.attr("fill", cf);
+    }
 }
 
 spaceD3.highlightSelectedPlanetOrbit = function(x, h) {
@@ -34,7 +42,7 @@ spaceD3.highlightSelectedPlanetOrbit = function(x, h) {
     };
 
     // TODO: if selected orbit is not visible, then decrease distance as appropriate
-    spaceD3.drawCircles([spaceD3.solarsystemData[selectedId]], 0, h/2, rf, ".selected-orbit", "selected-orbit");
+    spaceD3.drawCircles([spaceD3.solarsystemData[selectedId]], 0, h/2, rf, null, null, ".selected-orbit", "selected-orbit");
 
 }
 
@@ -54,14 +62,14 @@ spaceD3.drawScene = function() {
     rf = function(d) {
         return x(parseFloat(d['pl_orbsmax']));
     };
-    spaceD3.drawCircles(spaceD3.exoplanetData, 0, h/2, rf, ".exo-orbit", "exo-orbit");
+    spaceD3.drawCircles(spaceD3.exoplanetData, 0, h/2, rf, null, null, ".exo-orbit", "exo-orbit");
     
     // draw solar orbits
     var xf, yf, rf;
     rf = function(d) {
         return x(d['au']);
     };
-    spaceD3.drawCircles(spaceD3.solarData, 0, h/2, rf, ".solar-orbit", "solar-orbit");
+    spaceD3.drawCircles(spaceD3.solarData, 0, h/2, rf, null, null, ".solar-orbit", "solar-orbit");
     
     // draw the exoplanets
     xf = function(d) {
@@ -72,7 +80,21 @@ spaceD3.drawScene = function() {
     rf = function(d) {
         return r(parseFloat(d['pl_rade'])*kmEarthRadius);
     };
-    spaceD3.drawCircles(spaceD3.exoplanetData, xf, h/2, rf, ".planet.extrasolar", "planet extrasolar");
+    var cs = function(d) {
+        var c = spaceD3.bodyMap[d['pl_hostname']+d['pl_letter']].exoplanetColor;
+        var r = Math.floor(c.r*255);
+        var g = Math.floor(c.g*255);
+        var b = Math.floor(c.b*255);
+        return "rgba("+r+","+g+","+b+",0.3)";
+    }
+    var cf = function(d) {
+        var c = spaceD3.bodyMap[d['pl_hostname']+d['pl_letter']].exoplanetColor;
+        var r = Math.floor(c.r*255);
+        var g = Math.floor(c.g*255);
+        var b = Math.floor(c.b*255);
+        return "rgba("+r+","+g+","+b+",0.1)";
+    }
+    spaceD3.drawCircles(spaceD3.exoplanetData, xf, h/2, rf, cs, cf, ".planet.extrasolar", "planet extrasolar");
     
     // Vertical line for selected planet
     spaceD3.highlightSelectedPlanetOrbit(x, h);
@@ -84,13 +106,14 @@ spaceD3.drawScene = function() {
     rf = function(d) {
         return r(d['radiuse']);
     };
-    spaceD3.drawCircles(spaceD3.solarData, xf, h/2, rf, ".planet.solar", "planet solar");
+    spaceD3.drawCircles(spaceD3.solarData, xf, h/2, rf, null, null, ".planet.solar", "planet solar");
 
 }
 
-spaceD3.start = function(solarsystemData, exoplanetData) {
+spaceD3.start = function(solarsystemData, exoplanetData, bodyMap) {
     spaceD3.solarsystemData = solarsystemData;
     spaceD3.exoplanetData = exoplanetData;
+    spaceD3.bodyMap = bodyMap;
 
     // Clean data for appropriate use with d3
     spaceD3.solarData = []

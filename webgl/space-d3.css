@@ -16,9 +16,7 @@
 }
 
 .extrasolar {
-    fill: rgba(255, 255, 255, 0.1);
     stroke-width: 1px;
-    stroke: rgba(200, 200, 200, 0.8);
 }
 
 .solar-orbit {
