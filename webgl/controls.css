@@ -104,35 +104,37 @@ li#Neptune {
     border: none;
 }
 
-#radius-multiplier {
+#radius-multiplier,
+#distance-multiplier {
     margin-top: 55px;
     margin-left: 50px;
 }
 
-
-#radius-multiplier-slider {
-    width: 200px;
+#radius-multiplier-slider,
+#distance-multiplier-slider {
+    width: 250px;
     display: inline-block;
     float: left;
     margin-left: 10px;
     clear: right;
 }
 
-#radius-multiplier-value {
+#radius-multiplier-value,
+#distance-multiplier-value {
     border: none;
     color: #f6931f;
     font-weight: bold;
-    width: 25px;
+    width: 35px;
     float: left;
     margin-left: 5px;
 }
 
-#radius-multiplier-label {
+#radius-multiplier-label,
+#distance-multiplier-label {
     float: left;
 }
 
-#scale-only-solarsystem-label {
-}
-
-#scale-only-solarsystem-checkbox {
+#toggle-view {
+    margin-left: 50px;
+    margin-top: 20px;
 }
