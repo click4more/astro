@@ -1,0 +1,138 @@
+label {
+    font-family: 'Tahoma', sans-serif;
+    font-size: 10px;
+}
+.zoom-control {
+    list-style-type: none;
+}
+
+.zoom-control li {
+    float: left;
+    margin: 0;
+    padding: 0;
+    height: 60px;
+    background: url('images/planets.png') no-repeat left top;
+}
+
+.zoom-control .ui-selected,
+.zoom-control .ui-selecting {
+    background: url('images/planets-selected.png') no-repeat left top;
+}
+
+li#Sun {
+    width: 50px;
+}
+
+li#Mercury {
+    width: 25px; 
+    background-position: -48px 0px;
+}
+
+li#Venus {
+    width: 35px; 
+    background-position: -75px 0px;
+}
+
+li#Earth {
+    width: 35px; 
+    background-position: -115px 0px;
+}
+
+li#Mars {
+    width: 35px; 
+    background-position: -150px 0px;
+}
+
+li#Jupiter {
+    width: 65px; 
+    background-position: -185px 0px;
+}
+
+li#Saturn {
+    width: 80px; 
+    background-position: -250px 0px;
+}
+
+li#Uranus {
+    width: 28px; 
+    background-position: -330px 0px;
+}
+
+li#Neptune {
+    width: 35px; 
+    background-position: -362px 0px;
+}
+#title {
+    font-family: 'Titillium Web', sans-serif;
+    width: 360px;
+    float: left;
+}
+
+#title h1 {
+    font-weight: 600;
+    font-size: 20pt;
+    margin-bottom: -10px;
+}
+
+#title h2 {
+    font-weight: 300;
+    font-size: 12pt;
+    letter-spacing: 2px;
+}
+
+#title p {
+    font-family: 'Tahoma', sans-serif;
+    font-size: 9pt;
+}
+
+#title a {
+    color: #444;
+}
+
+#title a:hover {
+    color: #3366FF;
+}
+
+#zoom-and-scale-controls {
+    float: left;
+}
+
+#zoom-and-scale-controls label {
+}
+
+#space {
+    border: none;
+}
+
+#radius-multiplier {
+    margin-top: 55px;
+    margin-left: 50px;
+}
+
+
+#radius-multiplier-slider {
+    width: 200px;
+    display: inline-block;
+    float: left;
+    margin-left: 10px;
+    clear: right;
+}
+
+#radius-multiplier-value {
+    border: none;
+    color: #f6931f;
+    font-weight: bold;
+    width: 25px;
+    float: left;
+    margin-left: 5px;
+}
+
+#radius-multiplier-label {
+    float: left;
+}
+
+#scale-only-solarsystem-label {
+}
+
+#scale-only-solarsystem-checkbox {
+}

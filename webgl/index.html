@@ -5,153 +5,48 @@
 <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
 
 <link href='http://fonts.googleapis.com/css?family=Titillium+Web:400,300,600' rel='stylesheet' type='text/css'>
+<link href='controls.css' rel='stylesheet' type='text/css'>
 <style type="text/css">
 body {
 }
 
-canvas {
+#space-webgl {
     display: block;
     clear: left;
+    left: 0;
 }
 
-label {
-    font-family: 'Tahoma', sans-serif;
-    font-size: 10px;
-}
-.zoom-control {
-    list-style-type: none;
-}
-
-.zoom-control li {
-    float: left;
-    margin: 0;
-    padding: 0;
-    height: 60px;
-    background: url('images/planets.png') no-repeat left top;
+#space-d3 {
+    display: block;
+    clear: left;
+    width: 800px;
+    height: 400px;
 }
 
-.zoom-control .ui-selected,
-.zoom-control .ui-selecting {
-    background: url('images/planets-selected.png') no-repeat left top;
+.planet {
 }
 
-li#Sun {
-    width: 50px;
+.solar {
+    fill: red;
 }
 
-li#Mercury {
-    width: 25px; 
-    background-position: -48px 0px;
+.extrasolar {
+    fill: rgba(50, 50, 50, 0.5);
 }
 
-li#Venus {
-    width: 35px; 
-    background-position: -75px 0px;
+.solar-orbit {
+    fill: none;
+    stroke-width: 2px;
+    stroke: #000;
 }
 
-li#Earth {
-    width: 35px; 
-    background-position: -115px 0px;
-}
-
-li#Mars {
-    width: 35px; 
-    background-position: -150px 0px;
-}
-
-li#Jupiter {
-    width: 65px; 
-    background-position: -185px 0px;
-}
-
-li#Saturn {
-    width: 80px; 
-    background-position: -250px 0px;
-}
-
-li#Uranus {
-    width: 28px; 
-    background-position: -330px 0px;
-}
-
-li#Neptune {
-    width: 35px; 
-    background-position: -362px 0px;
-}
-#title {
-    font-family: 'Titillium Web', sans-serif;
-    width: 360px;
-    float: left;
-}
-
-#title h1 {
-    font-weight: 600;
-    font-size: 20pt;
-    margin-bottom: -10px;
-}
-
-#title h2 {
-    font-weight: 300;
-    font-size: 12pt;
-    letter-spacing: 2px;
-}
-
-#title p {
-    font-family: 'Tahoma', sans-serif;
-    font-size: 9pt;
-}
-
-#title a {
-    color: #444;
-}
-
-#title a:hover {
-    color: #3366FF;
-}
-
-#zoom-and-scale-controls {
-    float: left;
-}
-
-#zoom-and-scale-controls label {
-}
-
-#space {
-    border: none;
-}
-
-#radius-multiplier {
-    margin-top: 55px;
-    margin-left: 50px;
+.exo-orbit {
+    fill: none;
+    stroke-width: 1px;
+    stroke: rgba(10, 10, 10, 0.2);
 }
 
 
-#radius-multiplier-slider {
-    width: 200px;
-    display: inline-block;
-    float: left;
-    margin-left: 10px;
-    clear: right;
-}
-
-#radius-multiplier-value {
-    border: none;
-    color: #f6931f;
-    font-weight: bold;
-    width: 25px;
-    float: left;
-    margin-left: 5px;
-}
-
-#radius-multiplier-label {
-    float: left;
-}
-
-#scale-only-solarsystem-label {
-}
-
-#scale-only-solarsystem-checkbox {
-}
 </style>
 
 <link rel="stylesheet" href="http://code.jquery.com/ui/1.9.0/themes/base/jquery-ui.css" />
@@ -159,6 +54,7 @@ li#Neptune {
 <script src="http://code.jquery.com/ui/1.9.0/jquery-ui.js"></script>
 <script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
 <script type="text/javascript" src="webgl-utils.js"></script>
+<script type="text/javascript" src="d3.v2.js"></script>
 
 <!-- line shaders --!>
 <script id="line-shader-fs" type="x-shader/x-fragment">
@@ -305,6 +201,9 @@ li#Neptune {
         }
         if (!gl) {
             alert("Could not initialise WebGL, sorry :-(");
+            return false;
+        } else {
+            return true;
         }
     }
 
@@ -526,8 +425,6 @@ li#Neptune {
             if(ratio < min) min = ratio;
             else if(ratio > max) max = ratio;
         }
-
-        console.log("min: "+min+", max: "+max);
 
         return {min: min, max: max};
     }
@@ -858,6 +755,10 @@ li#Neptune {
     }
 
     function tick() {
+        // if canvas is not visible, don't draw 
+        if($('#space-webgl').css('display')=='none') {
+            return;
+        }
         requestAnimFrame(tick);
         setMatrices();
         drawScene();
@@ -866,7 +767,7 @@ li#Neptune {
 
 
     function webGLStart() {
-        var canvas = document.getElementById("space");
+        var canvas = document.getElementById("space-webgl");
         initGL(canvas);
         initShaders();
         initBodies();
@@ -882,29 +783,106 @@ li#Neptune {
 
         tick();
     }
+
+    function d3DrawCircles(data, cx, cy, cr, selector, classname) {
+        // draw orbits for solar system planets
+        var solarorbits = svg.selectAll(selector)
+            .data(data)
+            .enter()
+            .append("circle")
+            .attr("class", classname);
+
+        solarorbits.attr("cx", cx)
+            .attr("cy", cy)
+            .attr("r", cr);
+    }
+
+    var svg;
+    function d3Start() {
+        var h = 400;
+        // Clean data for appropriate use with d3
+        var solarData = []
+        for(planetName in solarsystemData) {
+            solarData.push(solarsystemData[planetName]);
+        }
+
+        solarDataForOrbits = $.extend(true, [], solarData);
+        
+        svg = d3.select("body")
+            .append("svg")
+            .attr("id", "space-d3");
+        
+        var planetsXScaleLinear = d3.scale.linear()
+            .domain([0, 50])
+            .range([30, 770]);
+            //.range([10, 1000000]);
+        
+        var planetsRadiusScale = d3.scale.linear()
+            .domain([0, 100000])
+            .range([0, 30]);
+
+        // draw solar orbits
+        var xf, yf, rf;
+        rf = function(d) {
+            return planetsXScaleLinear(d['au']);
+        };
+        d3DrawCircles(solarData, 0, h/2, rf, "#solar-orbits", "solar-orbit");
+      
+        // draw the solar system
+        xf = function(d) {
+            return planetsXScaleLinear(d['au']);
+        };
+        rf = function(d) {
+            return planetsRadiusScale(d['radiuse'])
+        };
+        d3DrawCircles(solarData, xf, h/2, rf, "#solarplanets", "planet solar");
+        
+        // draw orbits for solar system planets
+        rf = function(d) {
+            var pd = planetsXScaleLinear(parseFloat(d['pl_orbsmax']));
+            return pd;
+        };
+        d3DrawCircles(exoplanetData, 0, h/2, rf, "#exo-orbits", "exo-orbit");
+        
+        // draw the exoplanets
+        xf = function(d) {
+            var pd = planetsXScaleLinear(parseFloat(d['pl_orbsmax']));
+            return pd;
+        };
+        var kmEarthRadius = solarsystemData['Earth']['radiuse'];
+        rf = function(d) {
+            return planetsRadiusScale(parseFloat(d['pl_rade'])*kmEarthRadius);
+        };
+        d3DrawCircles(exoplanetData, xf, h/2, rf, "#exoplanets", "planet extrasolar");
+
+        /*
+        var pdate = d3.scale.linear().domain([1, 31]).range([0, 800]);
+        var ax = d3.svg.axis()
+            .scale(pdate)
+            .orient("bottom")
+            .tickValues([1, 4, 8, 9, 19, 20, 24, 31]);
+
+        svg.append("g")
+            .attr("class", "axis")
+            .attr("transform", "translate(0, " + 300 + ")")
+            .call(ax);
+        */
+    }
     
     $.fn.exists = function () {
         return this.length !== 0;
     }
 
     $(document).ready(function() {
-        
         // Load data and start webgl visualization
         $.getJSON('solarsystem.json', function(sd) {
             solarsystemData = sd;
             $.getJSON('exoplanets_with_radii.json', function(ed) {
                 exoplanetData = ed;
                 webGLStart();
+                d3Start();
             });
         });
-    
-        // Make zoom available
-        /*
-        $('.zoom').click(function() {
-            console.log("clicked!");
-            planetZoomTarget = $(this).attr('id');
-        });
-        */
 
         $('.zoom-control').selectable();
 
@@ -936,6 +914,24 @@ li#Neptune {
         $('#scale-only-solarsystem-checkbox').click(function() {
             var currentScale = $('#radius-multiplier-slider').slider("value");
             if(currentScale > 1) {
+            }
+        });
+
+        $('#toggle-view').click(function() {
+            // if no webgl support, then no toggle
+            if(!gl) return;
+
+            if($('#space-webgl').css("display")=="none") {
+                console.log("2d view is on");
+                $('#space-webgl').show();
+                $('#space-webgl').css('display', 'block');
+                $('#space-d3').hide();
+                
+                // start webgl rendering loop again
+                tick();
+            } else {
+                $('#space-webgl').hide();
+                $('#space-d3').show();
             }
         });
 
@@ -980,12 +976,13 @@ li#Neptune {
                 <br />
                 <label id ="scale-only-solarsystem-label" for="scale-only-solarsystem-checkbox">Scale only solar system planets</label>
                 <input type="checkbox" id="scale-only-solarsystem-checkbox" />
+                <button id="toggle-view">Toggle View</button>
             </div>
         </div>
     </div>
-    
+
     <br />
-    <canvas id="space" width="800" height="400"></canvas>
+    <canvas id="space-webgl" width="800" height="400"></canvas>
     <br/>
 
     <br/>
