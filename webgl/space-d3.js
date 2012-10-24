@@ -2,10 +2,10 @@ var spaceD3 = window.spaceD3 = {};
 
 spaceD3.drawCircles = function(data, cx, cy, cr, cs, cf, selector, classname) {
     // first clear
-    svg.selectAll(selector).remove();
+    spaceD3.svg.selectAll(selector).remove();
 
     // draw orbits for solar system planets
-    var circles = svg.selectAll(selector)
+    var circles = spaceD3.svg.selectAll(selector)
         .data(data)
         .enter()
         .append("circle")
@@ -46,9 +46,43 @@ spaceD3.highlightSelectedPlanetOrbit = function(x, h) {
 
 }
 
+spaceD3.drawAxis = function(xs) {
+    spaceD3.svg.selectAll(".box").remove();
+    spaceD3.svg.selectAll("rect")
+        .data([0])
+        .enter()
+        .append("rect")
+        .attr("class", "box")
+        .attr("x", 0)
+        .attr("y", 350)
+        .attr("width", 800)
+        .attr("height", 50);
+    
+    var ax = d3.svg.axis()
+        .scale(xs)
+        .orient("bottom");
+    
+    var ticks = [0];
+    for(var i=0; i<spaceD3.solarData.length; i++) {
+        px = spaceD3.solarData[i]['au'];
+        ticks.push(px);
+    }
+    console.log(ticks);
+    ax.tickValues(ticks);
+
+    spaceD3.svg.selectAll(".axis").remove();
+    spaceD3.svg.append("g")
+        .attr("class", "axis")
+        .attr("transform", "translate(-2, "+355+")")
+        .call(ax.tickFormat(d3.format(".1 AU")));
+}
+
+spaceD3.drawLegend = function() {
+}
+
 spaceD3.drawScene = function() {
     var h = 400;
-    var distanceMultiplier = $('#distance-multiplier-value').val();
+    distanceMultiplier = $('#distance-multiplier-value').val();
 
     var x = d3.scale.linear()
         .domain([0, 770])
@@ -107,7 +141,9 @@ spaceD3.drawScene = function() {
         return r(d['radiuse']);
     };
     spaceD3.drawCircles(spaceD3.solarData, xf, h/2, rf, null, null, ".planet.solar", "planet solar");
-
+    
+    spaceD3.drawAxis(x);
+    spaceD3.drawLegend();
 }
 
 spaceD3.start = function(solarsystemData, exoplanetData, bodyMap) {
@@ -121,7 +157,7 @@ spaceD3.start = function(solarsystemData, exoplanetData, bodyMap) {
         spaceD3.solarData.push(spaceD3.solarsystemData[planetName]);
     }
 
-    svg = d3.select("body")
+    spaceD3.svg = d3.select("body")
         .append("svg")
         .attr("id", "space-d3");
 

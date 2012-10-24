@@ -1,9 +1,14 @@
 #space-d3 {
     display: block;
-    clear: left;
     background-color: #000;
+    clear: left;
     width: 800px;
     height: 400px;
+}
+
+.box {
+    fill: #fff;
+    stroke: none;
 }
 
 .planet {
@@ -37,4 +42,18 @@
     stroke: #0f0;
 }
 
+.axis line,
+.axis path {
+    fill: none;
+    stroke: #666;
+    stroke-width: 1px;
+    shape-rendering: crispEdges;
+}
+
+.axis text {
+    font-family: verdana, sans-serif;
+    font-size: 10px;
+    stroke: none;
+    fill: #666;
+}
 
