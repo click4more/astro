@@ -24,18 +24,36 @@ spaceD3.drawCircles = function(data, cx, cy, cr, cs, cf, selector, classname) {
     }
 }
 
-spaceD3.highlightSelectedPlanetOrbit = function(x, h) {
-    // draw neon vertical line at selected planet
+spaceD3.getSelectedPlanetId = function() {
     var selected = $('.ui-selected');
-    if(!selected.exists()) return;
+    if(!selected.exists()) return null;
 
     var selectedId = selected.attr("id");
-    if(selectedId=="Sun") {
+    if(selectedId==="Sun") {
         d3.selectAll(".selected-orbit").remove();
-        return;
+        return null;
     }
 
-    console.log(selectedId);
+    return selectedId;
+};
+
+spaceD3.zoomToPlanet = function() {
+    var selectedId = spaceD3.getSelectedPlanetId();
+    if(!selectedId) return;
+
+    // compute the distance multiplier that would
+    // make the planet appear at the center of the screen
+    // mid-screen x value (400) = orbitAu/(770*distanceMultiplier)
+    // distanceMultiplier = 400*770/orbitAu;
+    var orbitAu = spaceD3.solarsystemData[selectedId]['au'];
+    var distanceMultiplier = Math.floor(400/orbitAu + 30/770);
+    $('#distance-multiplier-value').val(distanceMultiplier);
+};
+
+// highlight the orbit of the selected planet with neon green
+spaceD3.highlightSelectedPlanetOrbit = function(x, h) {
+    var selectedId = spaceD3.getSelectedPlanetId();
+    if(!selectedId) return;
 
     var rf = function(d) {
         return x(d['au']);
@@ -80,13 +98,14 @@ spaceD3.drawAxis = function(xs) {
 spaceD3.drawLegend = function() {
 }
 
+spaceD3.offsetX = 30;
 spaceD3.drawScene = function() {
     var h = 400;
     distanceMultiplier = $('#distance-multiplier-value').val();
 
     var x = d3.scale.linear()
         .domain([0, 770])
-        .range([30, 770*distanceMultiplier]);
+        .range([spaceD3.offsetX, 770*distanceMultiplier]);
 
     var r = d3.scale.linear()
         .domain([0, 100000])
