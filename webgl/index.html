@@ -21,11 +21,10 @@
             <h1>Many Worlds</h1>
             <h2>by <a href="http://dcpos.ch">DC</a> and <a href="http://jiwonk.im">Jiwon</a></h2> 
             <p>
-                You are looking at all confirmed exoplanets. For perspective, they're shown orbiting our star, the sun, alongside the planets in our solar system.
-                The radii and distances are accurately scaled, but you can increase the radii for a better view of distant planets.
+                You are looking at all confirmed exoplanets that have radii and orbit data. For perspective, they're shown orbiting our star, the sun, alongside the planets in our solar system.
             </p> 
             <p class="webgl">
-                Use 'w' to zoom in, 'e' to do it faster. Use 's' to zoom out, 'd' to do it faster. Click and drag to rotate.
+                The radii and distances are accurately scaled, but you can increase the radii for a better view of distant planets. Use 'w' to zoom in, 'e' to do it faster. Use 's' to zoom out, 'd' to do it faster. Click and drag to rotate.
             </p>
             <p class="d3">
                 Try dragging the distance multiplier slider to the right to distinguish planets that are spaced too closely together, or to the left to see planets that are further away from the center of their orbit.
@@ -79,6 +78,12 @@
     <script src="http://code.jquery.com/ui/1.9.0/jquery-ui.js"></script>
     <script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
     <script type="text/javascript" src="webgl-utils.js"></script>
+    <script type="text/javascript" src="space-webgl.js"></script>
+    <script type="text/javascript" src="space-d3.js"></script>
+    <script type="text/javascript" src="controls.js"></script>
+    <script type="text/javascript" src="color-legend.js"></script>
+    
+    
     <script type="text/javascript" src="d3.v2.js"></script>
     <script type="text/javascript">
         $.fn.exists = function () {
@@ -89,10 +94,7 @@
             return this.substring(this.length-str.length)==str;
         };
     </script>
-    <script type="text/javascript" src="space-webgl.js"></script>
-    <script type="text/javascript" src="space-d3.js"></script>
-    <script type="text/javascript" src="controls.js"></script>
-    <script type="text/javascript" src="color-legend.js"></script>
+    
 
     <script type="text/javascript" src="exo-d3.js"></script>
 </body>
