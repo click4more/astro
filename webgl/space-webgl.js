@@ -464,6 +464,7 @@ spaceWebGL.drawScene = function() {
     spaceWebGL.gl.uniform3f(spaceWebGL.currentProgram.lightPosition, 0., 0., -10.);
 
     for(var i=0; i<=spaceWebGL.bodies.length; i++) {
+
         var scale = radiusMultiplier;
         spaceWebGL.mvPushMatrix();
         var body;
@@ -508,7 +509,23 @@ spaceWebGL.drawScene = function() {
     
     // Draw exoplanets
     var scale = scaleOnlySolar ? 1. : radiusMultiplier;
+
+    // Only selected
+    var selNames = null;
+    if(exoD3.selected){
+        selNames = {};
+        for(var i = 0; i < exoD3.selected.length; i++){
+            selNames[exoD3.selected[i].name] = 1;
+        }
+    }
     for(var i=0; i<spaceWebGL.exoplanets.length; i++) {
+        if(i < spaceWebGL.exoplanets.length){
+            var name  = spaceWebGL.exoplanets[i].name;
+            if(selNames != null && !selNames[name]){
+                continue;
+            }
+        }
+
         spaceWebGL.mvPushMatrix();
         mat4.rotate(spaceWebGL.mvMatrix, spaceWebGL.degToRad(spaceWebGL.exoplanets[i].azith), [0,1,0]);
         mat4.rotate(spaceWebGL.mvMatrix, spaceWebGL.degToRad(spaceWebGL.exoplanets[i].elev), [1,0,0]);

@@ -357,7 +357,7 @@ spaceD3.drawScene = function() {
         var r = Math.floor(c.r*255);
         var g = Math.floor(c.g*255);
         var b = Math.floor(c.b*255);
-        return "rgba("+r+","+g+","+b+",0.6)";
+        return "rgba("+r+","+g+","+b+",0.65)";
     }
     var cf = function(d) {
         var c = spaceD3.bodyMap[d['name']].exoplanetColor;
