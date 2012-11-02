@@ -8,6 +8,7 @@
 <link href='controls.css' rel='stylesheet' type='text/css'>
 <link rel="stylesheet" href="space-webgl.css" />
 <link rel="stylesheet" href="space-d3.css" />
+<link rel="stylesheet" href="color-legend.css" />
 
 <link rel="stylesheet" href="http://code.jquery.com/ui/1.9.0/themes/base/jquery-ui.css" />
 <script type="text/javascript" src="jquery-1.8.2.min.js"></script>  
@@ -16,6 +17,7 @@
 <script type="text/javascript" src="webgl-utils.js"></script>
 <script type="text/javascript" src="d3.v2.js"></script>
 <script type="text/javascript" src="space-d3.js"></script>
+<script type="text/javascript" src="color-legend.js"></script>
 
 
 <!-- exoplanet shaders --!>
@@ -143,6 +145,7 @@
                 exoplanetData = ed;
                 spaceWebGL.webGLStart(sd, ed);
                 spaceD3.start(sd, ed, spaceWebGL.allBodies);
+                colorLegend.draw();
                 
                 $('.webgl').show();
                 $('.d3').hide();
@@ -222,6 +225,7 @@
             }
 
         });
+
     });
 
     function isVisible(element) {
@@ -249,7 +253,7 @@
                 Try dragging the distance multiplier slider to the right to distinguish planets that are spaced too closely together, or to the left to see planets that are further away from the center of their orbit.
             </p>
         </div>
-        <div id="zoom-and-scale-controls">
+        <div id="right">
             <p class="toggle-view">Currently viewing visualization in <span class="d3">D3</span><span class="webgl">WebGL</span></p>
             <button class="toggle-view d3">See WebGL view</button>
             <button class="toggle-view webgl">See D3 view</button>
@@ -274,13 +278,18 @@
                 <input type="text" id="radius-multiplier-value" />
                 <div id="radius-multiplier-slider"></div>
                 <br />
-                <label id ="scale-only-solarsystem-label" for="scale-only-solarsystem-checkbox">Scale only solar system planets</label>
+                <label id ="scale-only-solarsystem-label" for="scale-only-solarsystem-checkbox">
+                    Scale only <br />solar system planets
+                </label>
                 <input type="checkbox" id="scale-only-solarsystem-checkbox" />
             </div>
             <div id="distance-multiplier" class="d3">
                 <label id="distance-multiplier-label" for="distance-multiplier-slider">Scale Distance:</label>
                 <input type="text" id="distance-multiplier-value" />
                 <div id="distance-multiplier-slider"></div>
+            </div>
+            <div class="d3 axis-label">
+                Units: AU (distance from Earth to Sun) 
             </div>
         </div>
     </div>

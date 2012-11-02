@@ -11,11 +11,12 @@ span {
 }
 
 #top {
-    height: 240px;
+    height: 220px;
 }
 
 label {
-    font-size: 14px;
+    font-size: 12px;
+    line-height: 10px;
 }
 .zoom-control {
     list-style-type: none;
@@ -87,6 +88,7 @@ li#Neptune {
     font-weight: 600;
     font-size: 20pt;
     margin-bottom: -10px;
+    margin-top: 0px;
 }
 
 #title h2 {
@@ -108,7 +110,7 @@ li#Neptune {
     color: #3366FF;
 }
 
-#zoom-and-scale-controls {
+#right {
     float: left;
     height: 100%;
 }
@@ -157,3 +159,5 @@ li#Neptune {
     display: inline;
     font-family: 'Titillium Web', sans-serif;
 }
+
+

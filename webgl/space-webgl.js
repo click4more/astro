@@ -238,8 +238,8 @@ spaceWebGL.lerp = function(a, b, t) {
 
 spaceWebGL.computeExoplanetColor = function(exoplanet, range) {
     // color gradient
-    var blue = range.min;
-    var yellow = (range.max-1.)*0.3;
+    var green = range.min;
+    var yellow = /*(range.max-range.min)*0.5 + range.min; // */(range.max-1.)*0.3;
     var red = range.max;
     
     var solarMass = exoplanet['st_mass']!="" ? exoplanet['st_mass'] : exoplanet['st_rad'];
@@ -253,10 +253,10 @@ spaceWebGL.computeExoplanetColor = function(exoplanet, range) {
     
     var r, g, b, t;
     if (value < yellow) {
-        t = (value - blue)/(yellow - blue);
+        t = (value - green)/(yellow - green);
         r = spaceWebGL.lerp(0, 1, t);
-        g = spaceWebGL.lerp(0, 1, t);
-        b = spaceWebGL.lerp(1, 0, t);
+        g = spaceWebGL.lerp(0.6, 1, t);
+        b = spaceWebGL.lerp(0.3, 0, t);
     } else {
         t = (value - yellow)/(red - yellow);
         r = 1.;

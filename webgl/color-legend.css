@@ -1,0 +1,23 @@
+#color-legend {
+    width: 300;
+    height: 120;
+    position: absolute;
+    left: 555;
+    top: 185;
+}
+
+.color-legend-reference-line {
+    stroke-width: 1px;
+    stroke: #aaa;
+}
+
+.color-legend-reference-label {
+    fill: #000;
+    font-size: 9;
+}
+
+.color-legend-caption {
+    fill: #000;
+    font-size: 12;
+    text-anchor: end;
+}

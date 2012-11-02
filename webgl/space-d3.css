@@ -6,6 +6,15 @@
     height: 400px;
 }
 
+.axis-label {
+    position: absolute;
+    left: 10px;
+    top: 235px;
+    font-family: 'Tahoma', sans-serif;
+    font-size: 9pt;
+    color: #000;
+}
+
 .box {
     fill: #fff;
     stroke: none;
@@ -16,6 +25,7 @@
 
 .solar {
     fill: #04B4AE;
+    fill-opacity: 0.8;
     stroke-width: 2px;
     stroke: #0B4C5F;
 }
@@ -55,5 +65,30 @@
     font-size: 10px;
     stroke: none;
     fill: #666;
+}
+
+.size-legend {
+    fill: none;
+    stroke-width: 1px;
+    stroke: #fff;
+}
+
+.legend-line {
+    fill: none;
+    stroke-width: 1;
+    stroke: rgb(200, 200, 200);
+    stroke-opacity: 0.8;
+}
+
+.legend-label {
+    fill: rgba(255, 255, 255, 0.8);
+    font-size: 12;
+}
+
+.reference-tick-line {
+    fill: none;
+    stroke-width: 1;
+    stroke: rgb(200, 200, 200);
+    stroke-opacity: 0.5;
 }
 
