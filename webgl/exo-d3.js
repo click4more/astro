@@ -7,7 +7,7 @@
  */
 
 (function(){
-    function filterData(data){
+    function cleanData(data){
         var f = [];
         for(var i = 0; i < data.length; i++){
             var d = data[i];
@@ -44,20 +44,19 @@
         brush(this.svg);
 
         // Highlight the selected circles.
-        var fnX = this.fnX, fnY = this.fnY, fnClass = this.fnClass;
+        var eD3 = this;
         function brush() {
-          var e = brush.extent();
-          svg.selectAll("circle").attr("class", function(d) {
-            return e[0][0] <= fnX(d) && fnX(d) <= e[1][0]
-                && e[0][1] <= fnY(d) && fnY(d) <= e[1][1]
-                ? fnClass(d) : null;
-          });
+            eD3.filter.extent = brush.extent();
+            eD3.updateFilter();
         }
 
         // If the brush is empty, select all circles.
         function brushend() {
-            if (!brush.empty()) return;
-            svg.selectAll("circle").attr("class", fnClass);
+            var e = brush.extent();
+            if(Math.abs(Math.log(e[0][0]/e[1][0])) > 0.2) return;
+            if(Math.abs(Math.log(e[0][1]/e[1][1])) > 0.2) return;
+            eD3.filter.extent = null;
+            eD3.updateFilter();
         }
     }
 
@@ -100,20 +99,20 @@
             .scale(scaleY)
             .orient("left")
             .tickFormat(fnFmt(d3.format(".0f")));
-        svg.append("g")
+        this.svg.append("g")
             .attr("class", "axis")
             .attr("transform", "translate("+this.margin[3]+",0)")
             .call(axisY);
-        svg.append("g")
+        this.svg.append("g")
             .attr("class", "axis")
             .attr("transform", "translate(0,"+(this.size[1]-this.margin[2])+")")
             .call(axisX);
-        svg.append("text")
+        this.svg.append("text")
             .attr("class", "axislabel")
             .attr("x", 10)
             .attr("y", this.size[1]/2)
             .text("Star temp (K)");
-        svg.append("text")
+        this.svg.append("text")
             .attr("class", "axislabel")
             .attr("x", this.size[0]/2)
             .attr("y", this.size[1]-10)
@@ -135,7 +134,7 @@
             // tiny, normal, and gas giant, respectively
             return planetSize(d, ["", "planet normal", "planet gasgiant"]);
         };
-        svg.selectAll("circle")
+        this.svgPlot.selectAll("circle")
             .data(data)
             .enter()
             .append("circle")
@@ -149,7 +148,7 @@
 
     
         /* PLOT HABITABLE ZONE */
-        var svgHz = svg.append("g").attr("id", "habzone");
+        var svgHz = this.svg.append("g").attr("id", "habzone");
         var habzone = [];
         for(var temp = 3000; temp < 10000; temp += 200){
             var tfactor = Math.pow(temp / 5780, 0.333333333);
@@ -185,6 +184,63 @@
             .attr("x", scaleX(3))
             .attr("y", this.margin[0]+30)
             .text("Too cold (no liquid water)");
+        
+    }
+    
+    function createLegend(){
+        /* PLOT LEGEND - circles and labels */
+        this.planetTypes = [
+            {'name':'normal', 'enabled':true, 'r':6},
+            {'name':'gasgiant', 'enabled':true, 'r':10}];
+        var svgLegend = this.svg.append("svg:g").data(this.planetTypes);
+        var xC = this.size[0] - 210, xL = this.size[0]-190;
+        var y1 = 100, y2 = 125;
+        var eD3 = this; 
+        svgLegend.append("circle")
+            .attr("cx", xC).attr("cy", y1)
+            .attr("r", 6)
+            .attr("class", "legend planet normal")
+            .on("mousedown", function(){
+                eD3.filter.type.normal = !eD3.filter.type.normal;
+                $(this).attr("class",eD3.filter.type.normal ?
+                    "legend planet normal" : "legend");
+                eD3.updateFilter();
+            });
+        svgLegend.append("text")
+            .attr("x", xL).attr("y", y1)
+            .attr("class", "legendlabel")
+            .text("Gravity similar to Earth's");
+        svgLegend.append("circle")
+            .attr("cx", xC).attr("cy", y2)
+            .attr("r", 10)
+            .attr("class", "legend planet gasgiant")
+            .on("mousedown", function(){
+                eD3.filter.type.gasgiant = !eD3.filter.type.gasgiant;
+                $(this).attr("class", eD3.filter.type.gasgiant ?
+                    "legend planet gasgiant" : "legend");
+                console.log("WTF "+this['class']);
+                eD3.updateFilter();
+            });
+        svgLegend.append("text")
+            .attr("x", xL).attr("y", y2)
+            .attr("class", "legendlabel")
+            .text(">10x Earth mass. Likely gas giant.");
+    }
+
+    function updateFilter(){
+        var eD3 = this;
+        eD3.svgPlot.selectAll("circle").attr("class", function(d) {
+            var sel = true;
+            var e = eD3.filter.extent;
+            if(e){
+                sel = e[0][0] <= eD3.fnX(d) && eD3.fnX(d) <= e[1][0]
+                    && e[0][1] <= eD3.fnY(d) && eD3.fnY(d) <= e[1][1];
+            }
+            var gg = eD3.fnClass(d).endswith("gasgiant");
+            sel = sel && (!gg || eD3.filter.type.gasgiant);
+            sel = sel && (gg || eD3.filter.type.normal);
+            return sel ? eD3.fnClass(d) : null; 
+        });
     }
 
     window.ExoD3 = function(id, data){
@@ -192,13 +248,16 @@
         this.size = [800,600];
         this.margin = [10, 0, 50, 100];
 
-        // functions
-        this.createScatter = createScatter;
-        this.createBrush = createBrush;        
-
         // data
-        this.data = filterData(data);
-        console.log("filtered data, kept "+this.data.length+"/"+data.length);
+        this.data = cleanData(data);
+        console.log("cleaned data, kept "+this.data.length+"/"+data.length);
+        this.filter = {
+            type: {
+                gasgiant: true,
+                normal: true
+            }, 
+            extent: null
+        };
 
         // dom
         var svg = d3.select("body")
@@ -207,10 +266,17 @@
             .attr("width",this.size[0])
             .attr("height",this.size[1]);
         this.svg = svg.append("g").attr("id", "exoD3svg");
+        this.svgPlot = this.svg.append("g");
+
+        // functions
+        this.createScatter = createScatter;
+        this.createBrush = createBrush;        
+        this.createLegend = createLegend;
+        this.updateFilter = updateFilter;
 
         this.createScatter(this.data);
         this.createBrush();
-        
+        this.createLegend();
     };
 })();
 
@@ -230,7 +296,7 @@ $(function(){
             data.push(datum);
         }
 
-        exoD3 = ExoD3("exoD3", data);
+        window.exoD3 = new ExoD3("exoD3", data);
     }, "text");
 });
 
