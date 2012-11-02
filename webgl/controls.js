@@ -96,32 +96,16 @@
             // if no webgl support, then no toggle
             if(!spaceWebGL.gl) return;
 
-            if($('#space-webgl').css("display")=="none") {
-                $('#space-webgl').show();
-                $('#space-webgl').css('display', 'block');
-                $('#radius-multiplier').show();
-
-                $('#space-d3').hide();
-                $('#distance-multiplier').hide();
-                
-                // start webgl rendering loop again
-                spaceWebGL.tick();
+            if(isVisible($('#space-webgl'))) {
+                $('.webgl').hide();
+                $('.d3').show();
             } else {
-                $('#space-webgl').hide();
-                $('#radius-multiplier').hide();
-
-                $('#space-d3').show();
-                $('#distance-multiplier').show();
+                $('.webgl').show();
+                $('.d3').hide();
+                spaceWebGL.tick(); // resume rendering loop
             }
         });
         
-        $('#space-d3').hide();
-        $('#distance-multiplier').hide();
-        
-        $('#space-webgl').show();
-        $('#radius-multiplier').show();
-        
-
     });
 
     function isVisible(element) {

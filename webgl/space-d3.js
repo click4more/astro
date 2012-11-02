@@ -46,14 +46,14 @@ spaceD3.zoomToPlanet = function() {
     // mid-screen x value (400) = orbitAu/(770*distanceMultiplier)
     // distanceMultiplier = 400*770/orbitAu;
     var orbitAu = spaceD3.solarsystemData[selectedId]['au'];
-    var finalDistanceMultiplier = Math.floor(400/orbitAu + 30/770);
+    var finalDistanceMultiplier = Math.floor(400/orbitAu + spaceD3.offsetX/770);
 
     var dslider = $('#distance-multiplier-slider');
     var dvalue = $('#distance-multiplier-value');
     var currentDistanceMultiplier = dvalue.val();
 
     var numFrames = 30;
-    var duration = 1000; // milliseconds 
+    var duration = 500; // milliseconds 
     var diffPerFrame = (finalDistanceMultiplier-currentDistanceMultiplier)/numFrames;
     
     // smooth transition using 60 frames
@@ -87,40 +87,210 @@ spaceD3.highlightSelectedPlanetOrbit = function(x, h) {
 
 }
 
-spaceD3.drawAxis = function(xs) {
-    spaceD3.svg.selectAll(".box").remove();
-    spaceD3.svg.selectAll("rect")
-        .data([0])
-        .enter()
-        .append("rect")
-        .attr("class", "box")
-        .attr("x", 0)
-        .attr("y", 350)
-        .attr("width", 800)
-        .attr("height", 50);
-    
-    var ax = d3.svg.axis()
-        .scale(xs)
-        .orient("bottom");
-    
-    var ticks = [0];
-    for(var i=0; i<spaceD3.solarData.length; i++) {
-        px = spaceD3.solarData[i]['au'];
-        ticks.push(px);
-    }
-    ax.tickValues(ticks);
+spaceD3.drawAxisWithTickValues = function(ticks) {
+    spaceD3.ax.tickValues(ticks);
 
     spaceD3.svg.selectAll(".axis").remove();
     spaceD3.svg.append("g")
         .attr("class", "axis")
-        .attr("transform", "translate(-2, "+355+")")
-        .call(ax.tickFormat(d3.format(".1 AU")));
+        .attr("transform", "translate(0, 4)")
+        .call(spaceD3.ax.tickFormat(d3.format(".1 AU")));
+
+};
+
+spaceD3.drawAxis = function(xs) {
+    spaceD3.ax = d3.svg.axis()
+        .scale(xs)
+        .orient("bottom");
+    
+    var ticks = [0, 770];
+    for(var i=0; i<spaceD3.solarData.length; i++) {
+        px = spaceD3.solarData[i]['au'];
+        ticks.push(px);
+    }
+    spaceD3.ax.currentTickValues = ticks;
+    spaceD3.drawAxisWithTickValues(ticks);
+}
+
+spaceD3.labelAxis = function() {
+    spaceD3.svg.append("text")
+        .attr("class", "axis-label")
+        .attr("x", 790)
+        .attr("y", 390)
+        .text("Units: AU (distance from Earth to Sun)");
+}
+
+spaceD3.addTick = function() {
+    var mouse = d3.mouse(this);
+   
+    var distanceMultiplier = parseFloat($('#distance-multiplier-value').val());
+    var pixValue = parseFloat(mouse[0] - 10);
+    var orbitAu = (pixValue/(distanceMultiplier - spaceD3.offsetX/770)).toFixed(3);
+
+    var newTickValues = spaceD3.ax.currentTickValues.slice();
+    newTickValues.push(orbitAu);
+    spaceD3.drawAxisWithTickValues(newTickValues);
+    
+    spaceD3.svg.selectAll(".reference-tick-line").remove();
+    spaceD3.svg.append("svg:line")
+        .attr("class", "reference-tick-line")
+        .attr("x1", pixValue + spaceD3.offsetX)
+        .attr("y1", 0)
+        .attr("x2", pixValue + spaceD3.offsetX)
+        .attr("y2", 400);
+}
+
+spaceD3.removeReferenceLine = function() {
+    console.log("!");
+    spaceD3.svg.selectAll(".reference-tick-line").remove();
+    spaceD3.drawAxisWithTickValues(spaceD3.ax.currentTickValues);
 }
 
 spaceD3.drawLegend = function() {
-}
+    // size legend
+    var xpos = 720;
+    var ypos = 380;
+    var linewidth = 70;
 
-spaceD3.offsetX = 30;
+    var kmEarthRadius = spaceD3.solarsystemData['Earth']['radiuse'];
+    var r = function(d) {
+        return spaceD3.r(d*kmEarthRadius);
+    };
+    var rawData = [1, 5, 10, 20];
+    var processedData = [r(1), r(5), r(10), r(20)];
+    var identityFunction = function(d) {
+        return d;
+    }
+    var yf = function(d) {
+        return ypos - d;
+    };
+    spaceD3.drawCircles(processedData, xpos, yf, identityFunction, null, null, ".size-legend", "size-legend");
+
+    var lines = spaceD3.svg.selectAll(".legend-line")
+        .data(processedData)
+        .enter()
+        .append("svg:line")
+        .attr("class", "legend-line")
+        .attr("x1", xpos)
+        .attr("y1", function(d) {
+            return ypos-2*d;
+        })
+        .attr("x2", xpos+linewidth)
+        .attr("y2", function(d) {
+            return ypos-2*d;
+        });
+
+    var labels = spaceD3.svg.selectAll(".legend-label")
+        .data(rawData)
+        .enter()
+        .append("svg:text")
+        .attr("class", "legend-label")
+        .attr("x", function(d) {
+            var x = xpos+linewidth;
+            if(d<10) return x-5;
+            return x-10;
+        })
+        .attr("y", function(d) {
+            return ypos-2*r(d)-2;
+        })
+        .text(identityFunction);
+
+    var units = spaceD3.svg.append("svg:text")
+        .attr("class", "legend-label")
+        .attr("x", xpos - 50)
+        .attr("y", ypos + 13)
+        .text("Size units in Earth radius");
+
+    /*
+    // color legend
+    var colorLegendX = 420;
+    var colorLegendY = 340;
+    var colorLegendWidth = 200;
+    var colorLegendHeight = 20;
+    var pixelToRatio = d3.scale.linear()
+        .domain([0, colorLegendWidth])
+        .range([0.95, 83.33]);
+    var ratioToPixel = d3.scale.linear()
+        .domain([0.95, 83.33])
+        .range([0, colorLegendWidth]);
+    var colorScale = d3.scale.linear() 
+        .domain([0.95, 25, 83.33]) 
+        .interpolate(d3.interpolateRgb) 
+        .range(["#00994C", "yellow", "red"]); 
+
+    var colorScaleData = [];
+    for(var i=0; i<colorLegendWidth; i++) {
+        colorScaleData.push(i);
+    }
+
+    spaceD3.svg.selectAll(".color-legend")
+        .data(colorScaleData)
+        .enter()
+        .append("svg:rect")
+        .attr("class", "color-legend")
+        .attr("x", function(d) {
+            return d + colorLegendX;
+        })
+        .attr("y", colorLegendY)
+        .attr("width", 1)
+        .attr("height", colorLegendHeight)
+        .attr("fill", function(d) {
+            return colorScale(pixelToRatio(d));
+        });
+
+    // draw reference points on color legend
+    // solarMass / au Earth: 1
+    var colorLegendTicks = [1, 83];
+    spaceD3.svg.selectAll(".color-legend-reference-line")
+        .data(colorLegendTicks)
+        .enter()
+        .append("svg:line")
+        .attr("class", "color-legend-reference-line")
+        .attr("x1", function(d) {
+            return parseFloat(colorLegendX + ratioToPixel(d));
+        })
+        .attr("y1", colorLegendY - 10)
+        .attr("x2", function(d) {
+            return parseFloat(colorLegendX + ratioToPixel(d));
+        })
+        .attr("y2", colorLegendY);
+
+    // label reference points
+    spaceD3.svg.append("svg:text")
+        .attr("class", "color-legend-reference-label")
+        .attr("x", colorLegendX)
+        .attr("y", colorLegendY - 15)
+        .text("1");
+    
+    spaceD3.svg.append("svg:text")
+        .attr("class", "color-legend-reference-label")
+        .attr("x", colorLegendX + colorLegendWidth - 5)
+        .attr("y", colorLegendY - 15)
+        .text("83");
+
+    // label units
+    var colorLegendCaption = [
+        "Estimated surface temperature represented",
+        "as the ratio of stellar mass to distance from sun",
+        "where Earth has the ratio 1"
+    ]
+
+    spaceD3.svg.selectAll(".color-legend-caption")
+        .data(colorLegendCaption)
+        .enter()
+        .append("svg:text")
+        .attr("class", "color-legend-caption")
+        .attr("x", colorLegendX)
+        .attr("y", function(d, i) {
+            return colorLegendY + colorLegendHeight + (i+1)*10;
+        })
+        .text(function(d) {
+            return d;
+        });
+    */
+};
+
+spaceD3.offsetX = 20;
 spaceD3.drawScene = function() {
     var h = 400;
     distanceMultiplier = $('#distance-multiplier-value').val();
@@ -132,6 +302,7 @@ spaceD3.drawScene = function() {
     var r = d3.scale.linear()
         .domain([0, 100000])
         .range([0, 30]);
+    spaceD3.r = r;
 
     // draw orbits for extrasolar planets
     rf = function(d) {
@@ -184,7 +355,6 @@ spaceD3.drawScene = function() {
     spaceD3.drawCircles(spaceD3.solarData, xf, h/2, rf, null, null, ".planet.solar", "planet solar");
     
     spaceD3.drawAxis(x);
-    spaceD3.drawLegend();
 }
 
 spaceD3.start = function(solarsystemData, exoplanetData, bodyMap) {
@@ -201,7 +371,11 @@ spaceD3.start = function(solarsystemData, exoplanetData, bodyMap) {
     spaceD3.svg = d3.select("body")
         .append("svg")
         .attr("id", "space-d3")
-        .append("g");
+        .attr("class", "d3");
+    
+    spaceD3.svg.on("mousemove", spaceD3.addTick);
+    spaceD3.svg.on("mouseout", spaceD3.removeReferenceLine);
 
     spaceD3.drawScene();
+    spaceD3.drawLegend();
 }

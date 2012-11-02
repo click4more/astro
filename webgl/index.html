@@ -9,8 +9,9 @@
 <link rel="stylesheet" href="space-webgl.css" />
 <link rel="stylesheet" href="space-d3.css" />
 <link rel="stylesheet" href="exo-d3.css" />
-
 <link rel="stylesheet" href="http://code.jquery.com/ui/1.9.0/themes/base/jquery-ui.css" />
+<link rel="stylesheet" href="color-legend.css" />
+
 </head>
 
 
@@ -23,12 +24,21 @@
                 You are looking at all confirmed exoplanets. For perspective, they're shown orbiting our star, the sun, alongside the planets in our solar system.
                 The radii and distances are accurately scaled, but you can increase the radii for a better view of distant planets.
             </p> 
-            <p>
+            <p class="webgl">
                 Use 'w' to zoom in, 'e' to do it faster. Use 's' to zoom out, 'd' to do it faster. Click and drag to rotate.
             </p>
+            <p class="d3">
+                Try dragging the distance multiplier slider to the right to distinguish planets that are spaced too closely together, or to the left to see planets that are further away from the center of their orbit.
+            </p>
         </div>
-        <div id="zoom-and-scale-controls">
-            <label for="zoom-control">Zoom: </label>
+        <div id="right">
+            <p class="toggle-view">Currently viewing visualization in <span class="d3">D3</span><span class="webgl">WebGL</span></p>
+            <button class="toggle-view d3">See WebGL view</button>
+            <button class="toggle-view webgl">See D3 view</button>
+            <br />
+            <label id="zoom-label" for="zoom-control">
+                Zoom to one of our own planets:
+            </label>
             <ul class="zoom-control">
                 <li class="zoom" id="Sun"></li>
                 <li class="zoom" id="Mercury"></li>
@@ -41,20 +51,24 @@
                 <li class="zoom" id="Neptune"></li>
             </ul>
             <br />
-            <div id="radius-multiplier">
+            <div id="radius-multiplier" class="webgl">
                 <label id="radius-multiplier-label" for="radius-multiplier-slider">Scale Radius:</label>
                 <input type="text" id="radius-multiplier-value" />
                 <div id="radius-multiplier-slider"></div>
                 <br />
-                <label id ="scale-only-solarsystem-label" for="scale-only-solarsystem-checkbox">Scale only solar system planets</label>
+                <label id ="scale-only-solarsystem-label" for="scale-only-solarsystem-checkbox">
+                    Scale only <br />solar system planets
+                </label>
                 <input type="checkbox" id="scale-only-solarsystem-checkbox" />
             </div>
-            <div id="distance-multiplier">
+            <div id="distance-multiplier" class="d3">
                 <label id="distance-multiplier-label" for="distance-multiplier-slider">Scale Distance:</label>
                 <input type="text" id="distance-multiplier-value" />
                 <div id="distance-multiplier-slider"></div>
             </div>
-            <button id="toggle-view">Toggle View</button>
+            <div class="d3 axis-label">
+                Units: AU (distance from Earth to Sun) 
+            </div>
         </div>
     </div>
 
