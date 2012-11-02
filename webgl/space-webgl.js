@@ -18,27 +18,15 @@ spaceWebGL.initGL = function(canvas) {
 }
 
 spaceWebGL.getShader = function(gl, id) {
-    var shaderScript = document.getElementById(id);
-    if (!shaderScript) {
-        return null;
-    }
-
-    var str = "";
-    var k = shaderScript.firstChild;
-    while (k) {
-        if (k.nodeType == 3) {
-            str += k.textContent;
-        }
-        k = k.nextSibling;
-    }
+    var str = spaceWebGL.shaderSource[id];
 
     var shader;
-    if (shaderScript.type == "x-shader/x-fragment") {
+    if (id.endswith("_fs")) { //shaderScript.type == "x-shader/x-fragment") {
         shader = spaceWebGL.gl.createShader(spaceWebGL.gl.FRAGMENT_SHADER);
-    } else if (shaderScript.type == "x-shader/x-vertex") {
+    } else if (id.endswith("_vs")){ //shaderScript.type == "x-shader/x-vertex") {
         shader = spaceWebGL.gl.createShader(spaceWebGL.gl.VERTEX_SHADER);
     } else {
-        return null;
+        throw "shader id should end in _fs for frag shaders or _vs for vert shaders";
     }
 
     spaceWebGL.gl.shaderSource(shader, str);
@@ -101,7 +89,7 @@ spaceWebGL.createShaderProgram = function(fsid, vsid) {
 
 
 spaceWebGL.initShaders = function() {
-    spaceWebGL.exoplanetShaderProgram = spaceWebGL.createShaderProgram("exoplanet-shader-fs", "exoplanet-shader-vs");
+    spaceWebGL.exoplanetShaderProgram = spaceWebGL.createShaderProgram("exoplanet_shader_fs", "exoplanet_shader_vs");
 }
 
 spaceWebGL.mvMatrix = mat4.create();

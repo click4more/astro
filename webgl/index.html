@@ -8,239 +8,9 @@
 <link href='controls.css' rel='stylesheet' type='text/css'>
 <link rel="stylesheet" href="space-webgl.css" />
 <link rel="stylesheet" href="space-d3.css" />
+<link rel="stylesheet" href="exo-d3.css" />
 
 <link rel="stylesheet" href="http://code.jquery.com/ui/1.9.0/themes/base/jquery-ui.css" />
-<script type="text/javascript" src="jquery-1.8.2.min.js"></script>  
-<script src="http://code.jquery.com/ui/1.9.0/jquery-ui.js"></script>
-<script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
-<script type="text/javascript" src="webgl-utils.js"></script>
-<script type="text/javascript" src="d3.v2.js"></script>
-<script type="text/javascript" src="space-d3.js"></script>
-
-
-<!-- exoplanet shaders --!>
-<script id="exoplanet-shader-fs" type="x-shader/x-fragment">
-    precision mediump float;
-
-    // Use texture
-    uniform int textureFlag;
-    uniform int lightingFlag;
-    uniform sampler2D textureSampler;
-    uniform vec3 exoplanetColor;
-
-    // These are the input params per fragment,
-    // interpolated by webGL
-    varying vec3 eyePosition;
-    varying vec3 normal;
-    varying vec2 textureCoord; // texture coords
-    varying vec3 lightPosition; // position of light in camera pos
-
-    vec3 getMaterialColor() {
-        if(textureFlag==1) {
-            vec4 textureColor = texture2D(textureSampler, vec2(textureCoord.s, textureCoord.t));
-            return textureColor.rgb;
-        } else {
-            return exoplanetColor;
-        }
-    }
-
-    void main(void) {
-        // TODO: pass in instead of hard-coding
-        // diffuse, ambient, and specular materials
-        vec3 Kd = getMaterialColor();
-
-        if(lightingFlag==0) {
-            gl_FragColor = vec4(Kd, 1.);
-            return;
-        }
-        
-        // light source (hardcoded for now)
-        vec3 lightColor = vec3(1., 1., 1.);
-
-        // Normalized normal
-        vec3 N = normalize(normal);
-
-        // point light from (0,0,0), which is where the camera is always
-        vec3 L = normalize(lightPosition - eyePosition);
-        vec3 V = normalize(-eyePosition);
-        vec3 R = normalize(reflect(-L, N));
-
-        vec3 Ks = vec3(1, 1, 1);
-        vec3 Ka = vec3(0.2, 0.2, 0.2);
-
-        // compute the diffuse color coefficient
-        float Rd = max(0., dot(L, N));
-
-        vec3 diffuse = Rd * Kd * lightColor;
-        vec3 ambient = Ka * Kd * lightColor;
-        vec3 specular = pow(max(0.,dot(R,V)), 2.) * vec3(0.2,0.2,0.2);
-
-        // Tell webgl what the fragment color is
-        gl_FragColor = vec4(diffuse + ambient + specular, 1.);
-    }
-</script>
-
-<script id="exoplanet-shader-vs" type="x-shader/x-vertex">
-    // These are the input params per vertex,
-    // specified when we bind vertex positions, normals, and
-    // text coords as attributes
-    attribute vec3 vertexPosition;
-    attribute vec3 vertexNormal;
-    attribute vec2 vertexTextureCoord;
-
-    // The modelview, projection, and normal matrix passed in
-    uniform mat4 uMVMatrix;
-    uniform mat4 uPMatrix;
-    uniform mat3 uNMatrix;
-
-    uniform vec3 uLightPosition;
-
-    // These are the output values for the shader, to be
-    // interpolated across vertices and passed in per fragment
-    // to the fragment shader
-    varying vec3 eyePosition; // pos of vertex in eye (camera) space
-    varying vec3 normal; // normal at vertex
-    varying vec2 textureCoord;
-    varying vec3 lightPosition;
-
-    void main(void) {
-        // Transform vertex to get eye-space position of vertex
-        vec4 eyePositionHomo = uMVMatrix*vec4(vertexPosition, 1); // homogenous
-        eyePosition = eyePositionHomo.xyz;
-
-        // Transform normal appropriately and save
-        normal = uNMatrix*vertexNormal;
-
-        // Just copy texture coords
-        textureCoord = vertexTextureCoord;
-
-        // Transform light position into eye space
-        lightPosition = (uMVMatrix*vec4(uLightPosition, 1)).xyz;
-        
-        // Transform again to get clip-space coordinates via the
-        // projection matrix. The gl_Position variable tells webGL
-        // where the vertex should go
-        gl_Position = uPMatrix * uMVMatrix * vec4(vertexPosition, 1.0);
-
-    }
-</script>
-
-<script type="text/javascript">
-    $.fn.exists = function () {
-        return this.length !== 0;
-    }
-</script>
-<script type="text/javascript" src="space-webgl.js"></script>
-<script type="text/javascript">
-    $(document).ready(function() {
-        // Load data and start webgl visualization
-        $.getJSON('solarsystem.json', function(sd) {
-            solarsystemData = sd;
-            $.getJSON('exoplanets_with_radii.json', function(ed) {
-                exoplanetData = ed;
-                spaceWebGL.webGLStart(sd, ed);
-                spaceD3.start(sd, ed, spaceWebGL.allBodies);
-            });
-        });
-
-        $('.zoom-control').selectable({
-            selected: function(ev, ui) {
-                if(isVisible($('#space-d3'))) {
-                    spaceD3.zoomToPlanet();
-                }
-            }
-        });
-
-        // Let user define radius scale, default to 1, the minimum.
-        var rslider = $('#radius-multiplier-slider');
-        var rvalue = $('#radius-multiplier-value');
-        rslider.slider({
-            range: "min",
-            min: 1,
-            max: 50,
-            value: 1,
-            slide: function(event, ui) {
-                rvalue.val(ui.value);
-            }
-        });
-        rvalue.val(rslider.slider("value"));
-        rvalue.change(function() {
-            var value = rvalue.val();
-            if(value < 1) value = 1;
-            else if(value > 50) value = 50;
-            rvalue.val(value);
-            if(value != rslider.slider("value")) {
-                rslider.slider("value", value);
-            }
-        });
-        
-        // Let user scale distance to see crowded planets better
-        var dslider = $('#distance-multiplier-slider');
-        var dvalue = $('#distance-multiplier-value');
-        dslider.slider({
-            range: "min",
-            min: 1,
-            max: 5000,
-            value: 19,
-            slide: function(event, ui) {
-                dvalue.val(ui.value);
-                spaceD3.drawScene();
-                //$('.selected-ui').removeClass("selected-ui");
-            }
-        });
-        dvalue.val(dslider.slider("value"));
-        dvalue.change(function() {
-            var value = dvalue.val();
-            if(value < 1) value = 1;
-            else if(value > 5000) value = 5000;
-            dvalue.val(value);
-            if(value != dslider.slider("value")) {
-                dslider.slider("value", value);
-                spaceD3.drawScene();
-                //$('.selected-ui').removeClass("selected-ui");
-            }
-        });
-        
-
-        $('#toggle-view').click(function() {
-            // if no webgl support, then no toggle
-            if(!spaceWebGL.gl) return;
-
-            if($('#space-webgl').css("display")=="none") {
-                $('#space-webgl').show();
-                $('#space-webgl').css('display', 'block');
-                $('#radius-multiplier').show();
-
-                $('#space-d3').hide();
-                $('#distance-multiplier').hide();
-                
-                // start webgl rendering loop again
-                spaceWebGL.tick();
-            } else {
-                $('#space-webgl').hide();
-                $('#radius-multiplier').hide();
-
-                $('#space-d3').show();
-                $('#distance-multiplier').show();
-            }
-        });
-        
-        $('#space-d3').hide();
-        $('#distance-multiplier').hide();
-        
-        $('#space-webgl').show();
-        $('#radius-multiplier').show();
-        
-
-    });
-
-    function isVisible(element) {
-        return element.css("display")!="none";
-    }
-
-</script>
-
-
 </head>
 
 
@@ -291,7 +61,25 @@
     <br />
     <canvas id="space-webgl" width="800" height="400"></canvas>
 
-    <canvas id="viz-webgl" width="800" height="400"></canvas>
-</body>
+    <script type="text/javascript" src="jquery-1.8.2.min.js"></script>  
+    <script src="http://code.jquery.com/ui/1.9.0/jquery-ui.js"></script>
+    <script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
+    <script type="text/javascript" src="webgl-utils.js"></script>
+    <script type="text/javascript" src="d3.v2.js"></script>
+    <script type="text/javascript">
+        $.fn.exists = function () {
+            return this.length !== 0;
+        };
+        String.prototype.endswith = function(str) {
+            if(str.length > this.length) return false;
+            return this.substring(this.length-str.length)==str;
+        };
+    </script>
+    <script type="text/javascript" src="space-webgl.js"></script>
+    <script type="text/javascript" src="space-d3.js"></script>
+    <script type="text/javascript" src="controls.js"></script>
 
+    <script type="text/javascript" src="exo-d3.js"></script>
+</body>
 </html>
+
