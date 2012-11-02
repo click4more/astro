@@ -46,8 +46,32 @@ spaceD3.zoomToPlanet = function() {
     // mid-screen x value (400) = orbitAu/(770*distanceMultiplier)
     // distanceMultiplier = 400*770/orbitAu;
     var orbitAu = spaceD3.solarsystemData[selectedId]['au'];
-    var distanceMultiplier = Math.floor(400/orbitAu + 30/770);
-    $('#distance-multiplier-value').val(distanceMultiplier);
+    var finalDistanceMultiplier = Math.floor(400/orbitAu + 30/770);
+
+    var dslider = $('#distance-multiplier-slider');
+    var dvalue = $('#distance-multiplier-value');
+    var currentDistanceMultiplier = dvalue.val();
+
+    var numFrames = 30;
+    var duration = 1000; // milliseconds 
+    var diffPerFrame = (finalDistanceMultiplier-currentDistanceMultiplier)/numFrames;
+    
+    // smooth transition using 60 frames
+    var transition = setInterval(function() {
+        // update distance multiplier slider and label 
+        var newDistanceMultiplier = Math.floor(parseFloat(dvalue.val())+diffPerFrame);
+        dvalue.val(newDistanceMultiplier);
+        dslider.slider("value", newDistanceMultiplier);
+
+        // update display
+        spaceD3.drawScene();
+        
+        // stop transition when target is reached 
+        if((diffPerFrame < 0 && newDistanceMultiplier <= finalDistanceMultiplier) ||
+            (diffPerFrame > 0 && newDistanceMultiplier >= finalDistanceMultiplier)) {
+            clearInterval(transition);
+        }
+    }, duration/numFrames);
 };
 
 // highlight the orbit of the selected planet with neon green
@@ -59,7 +83,6 @@ spaceD3.highlightSelectedPlanetOrbit = function(x, h) {
         return x(d['au']);
     };
 
-    // TODO: if selected orbit is not visible, then decrease distance as appropriate
     spaceD3.drawCircles([spaceD3.solarsystemData[selectedId]], 0, h/2, rf, null, null, ".selected-orbit", "selected-orbit");
 
 }
@@ -85,7 +108,6 @@ spaceD3.drawAxis = function(xs) {
         px = spaceD3.solarData[i]['au'];
         ticks.push(px);
     }
-    console.log(ticks);
     ax.tickValues(ticks);
 
     spaceD3.svg.selectAll(".axis").remove();
@@ -178,7 +200,8 @@ spaceD3.start = function(solarsystemData, exoplanetData, bodyMap) {
 
     spaceD3.svg = d3.select("body")
         .append("svg")
-        .attr("id", "space-d3");
+        .attr("id", "space-d3")
+        .append("g");
 
     spaceD3.drawScene();
 }

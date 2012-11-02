@@ -145,8 +145,9 @@
 
         $('.zoom-control').selectable({
             selected: function(ev, ui) {
-                spaceD3.zoomToPlanet();
-                spaceD3.drawScene();  
+                if(isVisible($('#space-d3'))) {
+                    spaceD3.zoomToPlanet();
+                }
             }
         });
 
@@ -232,6 +233,10 @@
         
 
     });
+
+    function isVisible(element) {
+        return element.css("display")!="none";
+    }
 
 </script>
 
