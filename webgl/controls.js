@@ -1,5 +1,8 @@
 
     $(document).ready(function() {
+        $('.webgl').show();
+        $('.d3').hide();
+        
         // Load data and start webgl visualization
         var nloaded = 0;
         var toLoad = [
@@ -30,6 +33,10 @@
             };
             spaceWebGL.webGLStart(sd, ed);
             spaceD3.start(sd, ed, spaceWebGL.allBodies);
+            colorLegend.draw();
+            
+            $('.webgl').show();
+            $('.d3').hide();
         }
 
 
@@ -91,8 +98,7 @@
             }
         });
         
-
-        $('#toggle-view').click(function() {
+        $('.toggle-view').click(function() {
             // if no webgl support, then no toggle
             if(!spaceWebGL.gl) return;
 
