@@ -5,11 +5,20 @@ spaceD3.drawCircles = function(data, cx, cy, cr, cs, cf, selector, classname) {
     spaceD3.svg.selectAll(selector).remove();
 
     // draw orbits for solar system planets
+    var fmt0 = d3.format(".0f");
+    var fmt1 = d3.format(".1f");
     var circles = spaceD3.svg.selectAll(selector)
         .data(data)
         .enter()
         .append("circle")
         .attr("class", classname)
+        .on("mouseover", function(d){
+             $("#planetdata").html(
+                 "<h2>"+d.name+"</h2>"+
+                 "<div><emph>Mass: </emph> "+fmt0(d.pl_massj * 317)+"</div>"+
+                 "<div><emph>Length of year: </emph> "+fmt1(d.pl_orbper)+" Earth days</div>"+
+                 "<div><emph>Discovered: </emph> "+d.pl_disc+"</div>");
+        });
 
     circles.attr("cx", cx)
         .attr("cy", cy)

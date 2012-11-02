@@ -160,4 +160,10 @@ li#Neptune {
     font-family: 'Titillium Web', sans-serif;
 }
 
+#planetdata {
+position:absolute;
+left:900px;
+top:20px;
+font-family: 'Titillium Web', sans-serif;
+}
 
