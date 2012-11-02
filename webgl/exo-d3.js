@@ -109,7 +109,7 @@
             .call(axisX);
         this.svg.append("text")
             .attr("class", "axislabel")
-            .attr("x", 10)
+            .attr("x", 20)
             .attr("y", this.size[1]/2)
             .text("Star temp (K)");
         this.svg.append("text")
@@ -177,7 +177,7 @@
             .attr("y", this.margin[0]+40)
             .text("zone");
         svgHz.append("svg:text")
-            .attr("x", scaleX(0.1))
+            .attr("x", scaleX(0.02))
             .attr("y", this.margin[0]+30)
             .text("Too hot (no liquid water)");
         svgHz.append("svg:text")
@@ -193,7 +193,7 @@
             {'name':'normal', 'enabled':true, 'r':6},
             {'name':'gasgiant', 'enabled':true, 'r':10}];
         var svgLegend = this.svg.append("svg:g").data(this.planetTypes);
-        var xC = this.size[0] - 210, xL = this.size[0]-190;
+        var xC = this.size[0] - 150, xL = this.size[0]-130;
         var y1 = 100, y2 = 125;
         var eD3 = this; 
         svgLegend.append("circle")
@@ -209,7 +209,7 @@
         svgLegend.append("text")
             .attr("x", xL).attr("y", y1)
             .attr("class", "legendlabel")
-            .text("Gravity similar to Earth's");
+            .text("Earth-like gravity");
         svgLegend.append("circle")
             .attr("cx", xC).attr("cy", y2)
             .attr("r", 10)
@@ -218,13 +218,16 @@
                 eD3.filter.type.gasgiant = !eD3.filter.type.gasgiant;
                 $(this).attr("class", eD3.filter.type.gasgiant ?
                     "legend planet gasgiant" : "legend");
-                console.log("WTF "+this['class']);
                 eD3.updateFilter();
             });
         svgLegend.append("text")
             .attr("x", xL).attr("y", y2)
             .attr("class", "legendlabel")
-            .text(">10x Earth mass. Likely gas giant.");
+            .text(">10x Earth mass.");
+        svgLegend.append("text")
+            .attr("x", xL).attr("y", y2+15)
+            .attr("class", "legendlabel")
+            .text("Likely gas giant.");
     }
 
     function updateFilter(){
@@ -245,7 +248,7 @@
 
     window.ExoD3 = function(id, data){
         // geometry
-        this.size = [800,600];
+        this.size = [540,540];
         this.margin = [10, 0, 50, 100];
 
         // data

@@ -1,4 +1,8 @@
-
+#exoD3 {
+position:absolute;
+top:150;
+left:800;
+}
 
 /* SCATTERPLOT */
 #exoD3svg .axis {
