@@ -473,7 +473,7 @@ spaceWebGL.drawScene = function() {
     spaceWebGL.gl.useProgram(spaceWebGL.currentProgram);
 
     // Pass in light info
-    spaceWebGL.gl.uniform3f(spaceWebGL.currentProgram.lightPosition, -10., 0., 0.);
+    spaceWebGL.gl.uniform3f(spaceWebGL.currentProgram.lightPosition, 0., 0., -10.);
 
     for(var i=0; i<=spaceWebGL.bodies.length; i++) {
         var scale = radiusMultiplier;
