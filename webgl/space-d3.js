@@ -13,11 +13,13 @@ spaceD3.drawCircles = function(data, cx, cy, cr, cs, cf, selector, classname) {
         .append("circle")
         .attr("class", classname)
         .on("mouseover", function(d){
-             $("#planetdata").html(
+            $("#planetdata").html(
                  "<h2>"+d.name+"</h2>"+
-                 "<div><emph>Mass: </emph> "+fmt0(d.pl_massj * 317)+"</div>"+
-                 "<div><emph>Length of year: </emph> "+fmt1(d.pl_orbper)+" Earth days</div>"+
-                 "<div><emph>Discovered: </emph> "+d.pl_disc+"</div>");
+                 (d.pl_massj?"<div><emph>Mass: </emph> "+fmt0(d.pl_massj * 317)+" Earth masses</div>":"")+
+                 (d.pl_orbper?"<div><emph>Length of year: </emph> "+fmt1(d.pl_orbper)+" Earth days</div>":"")+
+                 (d.pl_disc?"<div><emph>Discovered: </emph> "+d.pl_disc+"</div>":"")
+            );
+            spaceD3.addTick(d); 
         });
 
     circles.attr("cx", cx)
@@ -129,12 +131,9 @@ spaceD3.labelAxis = function() {
         .text("Units: AU (distance from Earth to Sun)");
 }
 
-spaceD3.addTick = function() {
-    var mouse = d3.mouse(this);
-   
-    var distanceMultiplier = parseFloat($('#distance-multiplier-value').val());
-    var pixValue = parseFloat(mouse[0] - 10);
-    var orbitAu = (pixValue/(distanceMultiplier - spaceD3.offsetX/770)).toFixed(3);
+spaceD3.addTick = function(d) {
+    var orbitAu = d['pl_orbsmax'];
+    if(!orbitAu) return;
 
     var newTickValues = spaceD3.ax.currentTickValues.slice();
     newTickValues.push(orbitAu);
@@ -143,9 +142,9 @@ spaceD3.addTick = function() {
     spaceD3.svg.selectAll(".reference-tick-line").remove();
     spaceD3.svg.append("svg:line")
         .attr("class", "reference-tick-line")
-        .attr("x1", pixValue + spaceD3.offsetX)
+        .attr("x1", spaceD3.x(orbitAu))
         .attr("y1", 0)
-        .attr("x2", pixValue + spaceD3.offsetX)
+        .attr("x2", spaceD3.x(orbitAu))
         .attr("y2", 400);
 }
 
@@ -306,6 +305,7 @@ spaceD3.drawScene = function() {
     var x = d3.scale.linear()
         .domain([0, 770])
         .range([spaceD3.offsetX, 770*distanceMultiplier]);
+    spaceD3.x = x;
 
     var r = d3.scale.linear()
         .domain([0, 100000])
@@ -414,7 +414,6 @@ spaceD3.start = function(solarsystemData, exoplanetData, bodyMap) {
         .attr("id", "space-d3")
         .attr("class", "d3");
     
-    spaceD3.svg.on("mousemove", spaceD3.addTick);
     spaceD3.svg.on("mouseout", spaceD3.removeReferenceLine);
 
     spaceD3.drawScene();

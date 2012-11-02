@@ -161,9 +161,13 @@ li#Neptune {
 }
 
 #planetdata {
-position:absolute;
-left:900px;
-top:20px;
-font-family: 'Titillium Web', sans-serif;
+    position:absolute;
+    left:900px;
+    top: -10px;
+    font-family: 'Titillium Web', sans-serif;
+}
+
+#planetdata h2 {
+    margin-bottom: 0px;
 }
 
