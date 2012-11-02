@@ -133,6 +133,9 @@
 <script type="text/javascript" src="space-webgl.js"></script>
 <script type="text/javascript">
     $(document).ready(function() {
+        $('.webgl').show();
+        $('.d3').hide();
+        
         // Load data and start webgl visualization
         $.getJSON('solarsystem.json', function(sd) {
             solarsystemData = sd;
@@ -140,6 +143,9 @@
                 exoplanetData = ed;
                 spaceWebGL.webGLStart(sd, ed);
                 spaceD3.start(sd, ed, spaceWebGL.allBodies);
+                
+                $('.webgl').show();
+                $('.d3').hide();
             });
         });
 
@@ -202,36 +208,20 @@
         });
         
 
-        $('#toggle-view').click(function() {
+        $('.toggle-view').click(function() {
             // if no webgl support, then no toggle
             if(!spaceWebGL.gl) return;
 
-            if($('#space-webgl').css("display")=="none") {
-                $('#space-webgl').show();
-                $('#space-webgl').css('display', 'block');
-                $('#radius-multiplier').show();
-
-                $('#space-d3').hide();
-                $('#distance-multiplier').hide();
-                
-                // start webgl rendering loop again
-                spaceWebGL.tick();
+            if(isVisible($('#space-webgl'))) {
+                $('.webgl').hide();
+                $('.d3').show();
             } else {
-                $('#space-webgl').hide();
-                $('#radius-multiplier').hide();
-
-                $('#space-d3').show();
-                $('#distance-multiplier').show();
+                $('.webgl').show();
+                $('.d3').hide();
+                spaceWebGL.tick(); // resume rendering loop
             }
-        });
-        
-        $('#space-d3').hide();
-        $('#distance-multiplier').hide();
-        
-        $('#space-webgl').show();
-        $('#radius-multiplier').show();
-        
 
+        });
     });
 
     function isVisible(element) {
@@ -250,14 +240,23 @@
             <h1>Many Worlds</h1>
             <h2>by <a href="http://dcpos.ch">DC</a> and <a href="http://jiwonk.im">Jiwon</a></h2> 
             <p>
-                You are looking at our sun and its planets, along with confirmed extrasolar planets that have radii and orbit data that is included in the solar system for perspective. The radii and distances are accurately scaled (relatively, of course), but you can increase the radii for a better view of the planets.
-            </p> 
-            <p>
-                Use 'w' to zoom in, 'e' to do it faster. Use 's' to zoom out, 'd' to do it faster. Fiddle with the controls to change what you're looking at.
+                You are looking at our sun and its planets, along with confirmed extrasolar planets that are included in the solar system for perspective.
+            </p>
+            <p class="webgl">
+                The radii and distances are accurately scaled (relatively, of course), but you can increase the radii for a better view of the planets. Use 'w' to zoom in, 'e' to do it faster. Use 's' to zoom out, 'd' to do it faster. Fiddle with the controls to change what you're looking at.
+            </p>
+            <p class="d3">
+                Try dragging the distance multiplier slider to the right to distinguish planets that are spaced too closely together, or to the left to see planets that are further away from the center of their orbit.
             </p>
         </div>
         <div id="zoom-and-scale-controls">
-            <label for="zoom-control">Zoom: </label>
+            <p class="toggle-view">Currently viewing visualization in <span class="d3">D3</span><span class="webgl">WebGL</span></p>
+            <button class="toggle-view d3">See WebGL view</button>
+            <button class="toggle-view webgl">See D3 view</button>
+            <br />
+            <label id="zoom-label" for="zoom-control">
+                Zoom to one of our own planets:
+            </label>
             <ul class="zoom-control">
                 <li class="zoom" id="Sun"></li>
                 <li class="zoom" id="Mercury"></li>
@@ -270,7 +269,7 @@
                 <li class="zoom" id="Neptune"></li>
             </ul>
             <br />
-            <div id="radius-multiplier">
+            <div id="radius-multiplier" class="webgl">
                 <label id="radius-multiplier-label" for="radius-multiplier-slider">Scale Radius:</label>
                 <input type="text" id="radius-multiplier-value" />
                 <div id="radius-multiplier-slider"></div>
@@ -278,19 +277,16 @@
                 <label id ="scale-only-solarsystem-label" for="scale-only-solarsystem-checkbox">Scale only solar system planets</label>
                 <input type="checkbox" id="scale-only-solarsystem-checkbox" />
             </div>
-            <div id="distance-multiplier">
+            <div id="distance-multiplier" class="d3">
                 <label id="distance-multiplier-label" for="distance-multiplier-slider">Scale Distance:</label>
                 <input type="text" id="distance-multiplier-value" />
                 <div id="distance-multiplier-slider"></div>
             </div>
-            <button id="toggle-view">Toggle View</button>
         </div>
     </div>
 
     <br />
-    <canvas id="space-webgl" width="800" height="400"></canvas>
-
-    <canvas id="viz-webgl" width="800" height="400"></canvas>
+    <canvas id="space-webgl" class="webgl" width="800" height="400"></canvas>
 </body>
 
 </html>

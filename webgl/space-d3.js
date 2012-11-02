@@ -46,7 +46,7 @@ spaceD3.zoomToPlanet = function() {
     // mid-screen x value (400) = orbitAu/(770*distanceMultiplier)
     // distanceMultiplier = 400*770/orbitAu;
     var orbitAu = spaceD3.solarsystemData[selectedId]['au'];
-    var finalDistanceMultiplier = Math.floor(400/orbitAu + 30/770);
+    var finalDistanceMultiplier = Math.floor(400/orbitAu + spaceD3.offsetX/770);
 
     var dslider = $('#distance-multiplier-slider');
     var dvalue = $('#distance-multiplier-value');
@@ -115,12 +115,15 @@ spaceD3.drawAxis = function(xs) {
         .attr("class", "axis")
         .attr("transform", "translate(-2, "+355+")")
         .call(ax.tickFormat(d3.format(".1 AU")));
+
+    // label axis
+    
 }
 
 spaceD3.drawLegend = function() {
 }
 
-spaceD3.offsetX = 30;
+spaceD3.offsetX = 20;
 spaceD3.drawScene = function() {
     var h = 400;
     distanceMultiplier = $('#distance-multiplier-value').val();
@@ -201,6 +204,7 @@ spaceD3.start = function(solarsystemData, exoplanetData, bodyMap) {
     spaceD3.svg = d3.select("body")
         .append("svg")
         .attr("id", "space-d3")
+        .attr("class", "d3")
         .append("g");
 
     spaceD3.drawScene();
