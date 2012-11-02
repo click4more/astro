@@ -52,7 +52,7 @@ spaceD3.zoomToPlanet = function() {
     var dvalue = $('#distance-multiplier-value');
     var currentDistanceMultiplier = dvalue.val();
 
-    var numFrames = 30;
+    var numFrames = 20;
     var duration = 500; // milliseconds 
     var diffPerFrame = (finalDistanceMultiplier-currentDistanceMultiplier)/numFrames;
     
