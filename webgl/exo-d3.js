@@ -57,7 +57,6 @@ exoD3.selected = [];
         function brush() {
             eD3.filter.extent = brush.extent();
             eD3.updateFilter();
-            if(isVisible($('#space-d3'))) spaceD3.drawScene();
         }
 
         // If the brush is empty, select all circles.
@@ -260,7 +259,7 @@ exoD3.selected = [];
 
             return sel ? eD3.fnClass(d) : null; 
         });
-        //if(isVisible($('#space-d3'))) spaceD3.drawScene();
+        if(isVisible($('#space-d3'))) spaceD3.drawScene();
     }
 
     window.ExoD3 = function(id, data){

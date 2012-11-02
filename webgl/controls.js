@@ -27,6 +27,9 @@
         function doneLoading(){
             var sd = loaded[0];
             var ed = loaded[1];
+            for (var i=0; i<ed.length; i++) {
+                ed[i]['name'] = ed[i]['pl_hostname']+ed[i]['pl_letter'];
+            }
             spaceWebGL.shaderSource = {
                 'exoplanet_shader_fs':loaded[2],
                 'exoplanet_shader_vs':loaded[3]

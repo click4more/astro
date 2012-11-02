@@ -366,7 +366,13 @@ spaceD3.drawScene = function() {
         var b = Math.floor(c.b*255);
         return "rgba("+r+","+g+","+b+",0.1)";
     }
-    spaceD3.drawCircles(exoD3.selected, xf, h/2, rf, cs, cf, ".planet.extrasolar", "planet extrasolar");
+    var exos;
+    if(exoD3.selected && exoD3.selected.length) {
+        exos= exoD3.selected;
+    }else {
+        exos = spaceD3.exoplanetData;
+    }
+    spaceD3.drawCircles(exos, xf, h/2, rf, cs, cf, ".planet.extrasolar", "planet extrasolar");
     
     // Vertical line for selected planet
     spaceD3.highlightSelectedPlanetOrbit(x, h);
