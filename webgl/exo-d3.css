@@ -1,44 +1,44 @@
 
 
 /* SCATTERPLOT */
-.axis {
+#exoD3svg .axis {
 stroke-width:1px;
 stroke:#888;
 }
 
-.axislabel {
+#exoD3svg .axislabel {
 font:10px verdana,sans-serif;
 }
 
-circle {
+#exoD3svg circle {
 fill:#888;
 opacity:0.2;
 }
-.planet{
+#exoD3svg .planet{
 stroke-width:1;
 stroke:white;
 }
-.planet.normal{
+#exoD3svg .planet.normal{
 opacity:0.9;
 fill:#0d0;
 }
-.planet.gasgiant{
+#exoD3svg .planet.gasgiant{
 opacity:0.2;
 fill:#2de;
 }
 
 /* scatterplot selection (aka brush) */
-rect.extent {
+#exoD3svg rect.extent {
 fill: #099;
 fill-opacity: 0.1;
 stroke: #fff;
 }
 /* scatterplot-show relevant region */
-#habzone path{
+#exoD3svg #habzone path{
 fill: #0ef;
 fill-opacity: 0.3;
 }
-#habzone text {
+#exoD3svg #habzone text {
 stroke:white;
 stroke-width:2px;
 stroke-opacity:0.3;

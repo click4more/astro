@@ -57,6 +57,7 @@
             max: 50,
             value: 1,
             slide: function(event, ui) {
+                console.log("WTF");
                 rvalue.val(ui.value);
             }
         });

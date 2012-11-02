@@ -201,11 +201,12 @@
         console.log("filtered data, kept "+this.data.length+"/"+data.length);
 
         // dom
-        this.svg = d3.select("body")
+        var svg = d3.select("body")
             .append("svg")
             .attr("id", id)
             .attr("width",this.size[0])
             .attr("height",this.size[1]);
+        this.svg = svg.append("g").attr("id", "exoD3svg");
 
         this.createScatter(this.data);
         this.createBrush();
