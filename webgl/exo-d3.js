@@ -6,6 +6,9 @@
  * ...each exoplanet is a dot.
  */
 
+var exoD3 = window.exoD3 = {};
+exoD3.selected = [];
+
 (function(){
     function cleanData(data){
         var f = [];
@@ -23,12 +26,18 @@
             if(parseFloat(d.pl_masse) == 0) {
                 continue;
             }
-            f.push({
+            var name = d.pl_hostname=="Sol" ? d.pl_letter : d.pl_hostname + d.pl_letter;
+            var displayable = d.pl_rade != "";
+            var planet = {
                 st_teff: parseFloat(d.st_teff),
                 st_mass: parseFloat(d.st_mass),
                 pl_orbsmax: parseFloat(d.pl_orbsmax),
-                pl_masse: parseFloat(d.pl_masse)
-            });
+                pl_masse: parseFloat(d.pl_masse),
+                name: name,
+                displayable: displayable,
+                pl_rade: parseFloat(d.pl_rade)
+            };
+            f.push(planet);
         }
         // sort by descending size
         f.sort(function(a,b){return b.pl_masse-a.pl_masse;});
@@ -48,6 +57,7 @@
         function brush() {
             eD3.filter.extent = brush.extent();
             eD3.updateFilter();
+            if(isVisible($('#space-d3'))) spaceD3.drawScene();
         }
 
         // If the brush is empty, select all circles.
@@ -231,6 +241,8 @@
     }
 
     function updateFilter(){
+        exoD3.selected = [];
+
         var eD3 = this;
         eD3.svgPlot.selectAll("circle").attr("class", function(d) {
             var sel = true;
@@ -242,8 +254,13 @@
             var gg = eD3.fnClass(d).endswith("gasgiant");
             sel = sel && (!gg || eD3.filter.type.gasgiant);
             sel = sel && (gg || eD3.filter.type.normal);
+
+            // Let space view know which planets to display
+            if(sel && d.displayable) exoD3.selected.push(d);
+
             return sel ? eD3.fnClass(d) : null; 
         });
+        //if(isVisible($('#space-d3'))) spaceD3.drawScene();
     }
 
     window.ExoD3 = function(id, data){

@@ -71,7 +71,7 @@ spaceD3.zoomToPlanet = function() {
             (diffPerFrame > 0 && newDistanceMultiplier >= finalDistanceMultiplier)) {
             clearInterval(transition);
         }
-    }, duration/numFrames);
+    }, 10);
 };
 
 // highlight the orbit of the selected planet with neon green
@@ -141,7 +141,6 @@ spaceD3.addTick = function() {
 }
 
 spaceD3.removeReferenceLine = function() {
-    console.log("!");
     spaceD3.svg.selectAll(".reference-tick-line").remove();
     spaceD3.drawAxisWithTickValues(spaceD3.ax.currentTickValues);
 }
@@ -317,6 +316,7 @@ spaceD3.drawScene = function() {
     };
     spaceD3.drawCircles(spaceD3.solarData, 0, h/2, rf, null, null, ".solar-orbit", "solar-orbit");
     
+    /*
     // draw the exoplanets
     xf = function(d) {
         var pd = x(parseFloat(d['pl_orbsmax']));
@@ -331,7 +331,7 @@ spaceD3.drawScene = function() {
         var r = Math.floor(c.r*255);
         var g = Math.floor(c.g*255);
         var b = Math.floor(c.b*255);
-        return "rgba("+r+","+g+","+b+",0.3)";
+        return "rgba("+r+","+g+","+b+",0.6)";
     }
     var cf = function(d) {
         var c = spaceD3.bodyMap[d['pl_hostname']+d['pl_letter']].exoplanetColor;
@@ -341,6 +341,32 @@ spaceD3.drawScene = function() {
         return "rgba("+r+","+g+","+b+",0.1)";
     }
     spaceD3.drawCircles(spaceD3.exoplanetData, xf, h/2, rf, cs, cf, ".planet.extrasolar", "planet extrasolar");
+    
+    */
+    // draw the exoplanets
+    xf = function(d) {
+        var pd = x(d['pl_orbsmax']);
+        return pd;
+    };
+    var kmEarthRadius = spaceD3.solarsystemData['Earth']['radiuse'];
+    rf = function(d) {
+        return r(d['pl_rade']*kmEarthRadius);
+    };
+    var cs = function(d) {
+        var c = spaceD3.bodyMap[d['name']].exoplanetColor;
+        var r = Math.floor(c.r*255);
+        var g = Math.floor(c.g*255);
+        var b = Math.floor(c.b*255);
+        return "rgba("+r+","+g+","+b+",0.6)";
+    }
+    var cf = function(d) {
+        var c = spaceD3.bodyMap[d['name']].exoplanetColor;
+        var r = Math.floor(c.r*255);
+        var g = Math.floor(c.g*255);
+        var b = Math.floor(c.b*255);
+        return "rgba("+r+","+g+","+b+",0.1)";
+    }
+    spaceD3.drawCircles(exoD3.selected, xf, h/2, rf, cs, cf, ".planet.extrasolar", "planet extrasolar");
     
     // Vertical line for selected planet
     spaceD3.highlightSelectedPlanetOrbit(x, h);
