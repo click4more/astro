@@ -521,9 +521,9 @@ spaceWebGL.drawScene = function() {
     for(var i=0; i<spaceWebGL.exoplanets.length; i++) {
         if(i < spaceWebGL.exoplanets.length){
             var name  = spaceWebGL.exoplanets[i].name;
-            if(selNames != null && !selNames[name]){
+            if(selNames != null && !selNames[name] && exoD3.selected.length){
                 continue;
-            }
+            } 
         }
 
         spaceWebGL.mvPushMatrix();
