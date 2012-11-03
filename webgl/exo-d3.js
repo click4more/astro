@@ -33,6 +33,9 @@ exoD3.selected = [];
                 st_mass: parseFloat(d.st_mass),
                 pl_orbsmax: parseFloat(d.pl_orbsmax),
                 pl_masse: parseFloat(d.pl_masse),
+                pl_massj: parseFloat(d.pl_massj),
+                pl_disc: d['pl_disc\r'],
+                pl_orbper: d.pl_orbper,
                 name: name,
                 displayable: displayable,
                 pl_rade: parseFloat(d.pl_rade)
@@ -57,6 +60,7 @@ exoD3.selected = [];
         function brush() {
             eD3.filter.extent = brush.extent();
             eD3.updateFilter();
+            if(isVisible($('#space-d3'))) spaceD3.drawScene();
         }
 
         // If the brush is empty, select all circles.
@@ -66,6 +70,7 @@ exoD3.selected = [];
             if(Math.abs(Math.log(e[0][1]/e[1][1])) > 0.2) return;
             eD3.filter.extent = null;
             eD3.updateFilter();
+            exoD3.selected = [];
         }
     }
 
@@ -259,7 +264,6 @@ exoD3.selected = [];
 
             return sel ? eD3.fnClass(d) : null; 
         });
-        if(isVisible($('#space-d3'))) spaceD3.drawScene();
     }
 
     window.ExoD3 = function(id, data){
