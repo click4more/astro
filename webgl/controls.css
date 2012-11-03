@@ -171,3 +171,12 @@ li#Neptune {
     margin-bottom: 0px;
 }
 
+#note {
+    position: absolute;
+    left: 1050px;
+    top: 125px;
+    font-family: 'Titillium Web', sans-serif;
+    font-size: 9pt;
+    line-height: 9pt;
+    text-align: right;
+}
