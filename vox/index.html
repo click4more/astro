@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<title>Voxel Test</title>
+
+<h1>Voxel Test</h1>
+<canvas id="viewport" width="800" height="400"></canvas>
+
+<script>
+var gl = initGL();
+configureGL();
+var shader = initShaderProgram();
+var buffers = initBuffers();
+render();
+
+function initGL(){
+    var canvas = document.getElementById("viewport");
+    return canvas.getContext("webgl");
+}
+
+function configureGL() {
+    gl.clearColor(0,0,0,1);
+    gl.clearDepth(1);
+    gl.enable(gl.DEPTH_TEST);
+}
+
+function initShaderProgram() {
+    var shaderProgram = gl.createProgram();
+    gl.attachShader(shaderProgram, vertexShader);
+    gl.attachShader(shaderProgram, fragmentShader);
+    gl.linkProgram(shaderProgram);
+    gl.useProgram(shaderProgram);
+
+    var aVertPos = gl.getAttribLocation(shaderProgram, "aVertPos");
+    gl.enableVertexAttribArray(aVertPos);
+    return {
+        "aVertPos": aVertPos
+    };
+}
+
+function initBuffers() {
+    var bVertPos = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, bVertPos);
+    var vertices = [
+      // Front face
+      -1.0, -1.0,  1.0,
+       1.0, -1.0,  1.0,
+       1.0,  1.0,  1.0,
+      -1.0,  1.0,  1.0,
+      
+      // Back face
+      -1.0, -1.0, -1.0,
+      -1.0,  1.0, -1.0,
+       1.0,  1.0, -1.0,
+       1.0, -1.0, -1.0,
+      
+      // Top face
+      -1.0,  1.0, -1.0,
+      -1.0,  1.0,  1.0,
+       1.0,  1.0,  1.0,
+       1.0,  1.0, -1.0,
+      
+      // Bottom face
+      -1.0, -1.0, -1.0,
+       1.0, -1.0, -1.0,
+       1.0, -1.0,  1.0,
+      -1.0, -1.0,  1.0,
+      
+      // Right face
+       1.0, -1.0, -1.0,
+       1.0,  1.0, -1.0,
+       1.0,  1.0,  1.0,
+       1.0, -1.0,  1.0,
+      
+      // Left face
+      -1.0, -1.0, -1.0,
+      -1.0, -1.0,  1.0,
+      -1.0,  1.0,  1.0,
+      -1.0,  1.0, -1.0
+    ];
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW); 
+
+
+    var bVertIdx = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bVertIdx);
+    var vertIdx = [
+      0,  1,  2,      0,  2,  3,    // front
+      4,  5,  6,      4,  6,  7,    // back
+      8,  9,  10,     8,  10, 11,   // top
+      12, 13, 14,     12, 14, 15,   // bottom
+      16, 17, 18,     16, 18, 19,   // right
+      20, 21, 22,     20, 22, 23    // left
+    ];
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(vertIdx), gl.STATIC_DRAW);
+
+    return {
+        "bVertPos": bVertPos,
+        "bVertIdx": bVertIdx
+    };
+}
+
+function render() {
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    var matProj = makePerspective(45, 800/600, 0.1, 100);
+    renderCube();
+    requestAnimationFrame(render);
+}
+
+function renderCube() {
+    gl.uniformMatrix4fv(shader.uPMatrix, false, new Float32Array(perspectiveMatrix.flatten()));
+    gl.uniformMatrix4fv(shader.uMVMatrix, false, new Float32Array(mvMatrix.flatten()));
+    gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
+}
+
+
+</script>
