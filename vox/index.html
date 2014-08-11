@@ -2,7 +2,42 @@
 <title>Voxel Test</title>
 
 <h1>Voxel Test</h1>
+
 <canvas id="viewport" width="800" height="400"></canvas>
+
+<script id="shader-vs" type="x-shader/x-vertex">
+attribute highp vec3 aVertPos;
+
+uniform highp mat4 uPMatrix;
+uniform highp mat4 uMVMatrix;
+
+varying highp vec3 vFragPos;
+
+void main(void) {
+  vFragPos = aVertPos;
+  gl_Position = uPMatrix * uMVMatrix * vec4(aVertPos, 1.0);
+}
+</script>
+
+<script id="shader-fs" type="x-shader/x-fragment">
+//uniform int chunk[16*16*16];
+
+uniform highp vec3 uEyePos;
+varying highp vec3 vFragPos;
+
+void main(void) {
+  // vec3 rayDir = normalize(vFragPos - uEyePos);
+  // ivec3 blockIx = floor(vFragPos) - 16*floor(vFragPos*(1/16));
+  // ivec3 blockIx = ivec3((1.0/16.0)*floor(vFragPos*16.0) - floor(vFragPos));
+  highp vec3 blockIx = (1.0/16.0)*floor(vFragPos*16.0) - floor(vFragPos);
+  gl_FragColor = vec4(blockIx.x,blockIx.y,blockIx.z,1);
+  // gl_FragColor = vec4(1,0,0,1);
+}
+</script>
+
+<script src="sylvester.src.js"></script>
+
+<script src="glUtils.js"></script>
 
 <script>
 var gl = initGL();
@@ -22,20 +57,60 @@ function configureGL() {
     gl.enable(gl.DEPTH_TEST);
 }
 
+/**
+ * Compiles, links, and uses the shader program.
+ * Returns a map from the name of each uniform or attribute to its location.
+ */
 function initShaderProgram() {
+    var vertexShader = initShader("shader-vs");
+    var fragmentShader = initShader("shader-fs");
+
     var shaderProgram = gl.createProgram();
     gl.attachShader(shaderProgram, vertexShader);
     gl.attachShader(shaderProgram, fragmentShader);
     gl.linkProgram(shaderProgram);
     gl.useProgram(shaderProgram);
 
+    var uPMatrix = gl.getUniformLocation(shaderProgram, "uPMatrix");
+    var uMVMatrix = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+    var uEyePos = gl.getUniformLocation(shaderProgram, "uEyePos");
     var aVertPos = gl.getAttribLocation(shaderProgram, "aVertPos");
     gl.enableVertexAttribArray(aVertPos);
     return {
-        "aVertPos": aVertPos
+        "aVertPos": aVertPos,
+        "uPMatrix": uPMatrix,
+        "uMVMatrix": uMVMatrix,
+        "uEyePos": uEyePos
     };
 }
 
+/*
+ * Compiles a single vertex or fragment shader.
+ * Expects the ID of a <script> tag containing that shader.
+ */
+function initShader(id) {
+    var scriptTag = document.getElementById(id);
+    var script = scriptTag.firstChild.textContent;
+    var shader;
+    if(scriptTag.type == "x-shader/x-fragment") {
+        shader = gl.createShader(gl.FRAGMENT_SHADER);
+    } else if(scriptTag.type == "x-shader/x-vertex"){
+        shader = gl.createShader(gl.VERTEX_SHADER);
+    } else {
+        throw "Unknown shader type "+scriptTag.type+" on shader "+id;
+    }
+    gl.shaderSource(shader, script);
+    gl.compileShader(shader);
+    if(!gl.getShaderParameter(shader, gl.COMPILE_STATUS)){
+        throw "Compile error in shader "+id+": "+gl.getShaderInfoLog(shader);
+    }
+    return shader;
+}
+
+/*
+ * Uses bufferData() to populate all buffers.
+ * Returns a map from the buffer name (eg "bVertPos") to the buffer location.
+ */
 function initBuffers() {
     var bVertPos = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, bVertPos);
@@ -78,7 +153,6 @@ function initBuffers() {
     ];
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW); 
 
-
     var bVertIdx = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bVertIdx);
     var vertIdx = [
@@ -100,15 +174,25 @@ function initBuffers() {
 function render() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     var matProj = makePerspective(45, 800/600, 0.1, 100);
+    gl.uniformMatrix4fv(shader.uPMatrix, false, new Float32Array(matProj.flatten()));
+
     renderCube();
+
     requestAnimationFrame(render);
 }
 
 function renderCube() {
-    gl.uniformMatrix4fv(shader.uPMatrix, false, new Float32Array(perspectiveMatrix.flatten()));
-    gl.uniformMatrix4fv(shader.uMVMatrix, false, new Float32Array(mvMatrix.flatten()));
+    var loc = $V([0,0,-6]);
+    var matModelView = Matrix.I(4)
+        .x(Matrix.Translation(loc).ensure4x4());
+    gl.uniformMatrix4fv(shader.uMVMatrix, false, new Float32Array(matModelView.flatten()));
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.bVertPos); // point gl.ARRAY_BUFFER to bVertPos
+    gl.vertexAttribPointer(shader.aVertPos, 3, gl.FLOAT, false, 0, 0); // point aVertPos to gl.ARRAY_BUFFER
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.bVertIdx);
+
     gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
 }
 
-
 </script>
+
