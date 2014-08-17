@@ -11,11 +11,12 @@ attribute vec3 aVertPos;
 
 uniform mat4 uPMatrix;
 uniform mat4 uMVMatrix;
+uniform mat4 uFragMatrix;
 
 varying vec3 vFragPos;
 
 void main(void) {
-  vec4 vfrag = uMVMatrix * vec4(aVertPos, 1.0);
+  vec4 vfrag = uFragMatrix * vec4(aVertPos, 1.0);
   vFragPos = vfrag.xyz / vfrag.w;
   gl_Position = uPMatrix * uMVMatrix * vec4(aVertPos, 1.0);
 }
@@ -25,12 +26,14 @@ void main(void) {
 precision mediump float;
 
 uniform vec3 uEyePos;
-uniform vec3 uCenter[8];
+uniform vec3 uCenter[8]; // Centers of the spheres
+uniform vec3 uBounds[2]; // Bounds of the box
 
 varying vec3 vFragPos;
 
-vec3 ambientColor = vec3(0.1,0.1,0.1);
-vec3 diffuseColor = vec3(0.9,0.9,0.6);
+const vec3 ambientColor = vec3(0.1,0.1,0.1);
+const vec3 diffuseColor = vec3(0.9,0.9,0.6);
+const vec3 lightLocation = vec3(1,1,-15);
 
 vec3 shade(vec3 v, vec3 n, vec3 color, vec3 light) {
     vec3 lightN = normalize(light - v);
@@ -40,40 +43,97 @@ vec3 shade(vec3 v, vec3 n, vec3 color, vec3 light) {
 }
 
 void main(void) {
+  vec3 color = vec3(0,0,0);
+  vec3 eye = uEyePos;
   vec3 d = vFragPos - uEyePos;
-  gl_FragColor = vec4(0,0,0,1);
+  vec3 bounceColor = vec3(1,1,1);
 
-  // RAY-SPHERE INTERSECTION
-  // |(e + t*d) - c|^2 = r^2
-  // Let o = e-c
-  // (td.x)^2 + 2td.xo.x + o.x^2 + ... = r^2
-  // t^2 (|d|^2) + t (2 d dot o) + (|o|^2-r^2) = 0
-  // t =  -2 d dot o - sqrt(4 (d dot o)^2 - 4 (|d|^2)(|o|^2-r^2)) / (2 |d|^2)
-  //   = (-d dot o - sqrt((d dot o)^2 - |d|^2(|o|^2-r^2))) / |d|^2
-  float minT = 1e6;
-  for (int i = 0; i < 8; i++){
-    float r = 1.0;
-    vec3 o = uEyePos - uCenter[i];
-    float ddoto = dot(d,o);
-    float d2 = dot(d,d);
-    float determinant = ddoto*ddoto - d2*(dot(o,o)-r*r);
-    if(determinant < 0.0) {
-        continue;
-    } 
-    float t = (-ddoto - sqrt(determinant)) / d2;
-    if(t < 0.0) {
-        continue;
+  for(int i = 0; i < 3; i++) {
+    float closestT = 1e6;
+    vec3 closestColor;
+    vec3 closestIntersect;
+    vec3 closestNorm;
+    vec3 closestReflectance;
+
+    // RAY-SPHERE INTERSECTION
+    // |(e + t*d) - c|^2 = r^2
+    // Let o = e-c
+    // (td.x)^2 + 2td.xo.x + o.x^2 + ... = r^2
+    // t^2 (|d|^2) + t (2 d dot o) + (|o|^2-r^2) = 0
+    // t =  -2 d dot o - sqrt(4 (d dot o)^2 - 4 (|d|^2)(|o|^2-r^2)) / (2 |d|^2)
+    //   = (-d dot o - sqrt((d dot o)^2 - |d|^2(|o|^2-r^2))) / |d|^2
+    for (int i = 0; i < 8; i++){
+      float r = 1.0;
+      vec3 o = eye - uCenter[i];
+      float ddoto = dot(d,o);
+      float d2 = dot(d,d);
+      float determinant = ddoto*ddoto - d2*(dot(o,o)-r*r);
+      if(determinant < 0.0) {
+          continue;
+      } 
+      float t = (-ddoto - sqrt(determinant)) / d2;
+      if(t < 0.00001) {
+          continue;
+      }
+      if(t > closestT) {
+          continue;
+      }
+
+      closestT = t;
+      closestIntersect = eye + t*d;
+      closestNorm = closestIntersect - uCenter[i];
+      vec3 ballColor = vec3(0.1,0.7,0.7);
+      closestColor = shade(closestIntersect, closestNorm, ballColor, lightLocation);
+      closestReflectance = vec3(0.1,0.4,0.4);
     }
-    if(t > minT) {
-        continue;
+
+    // RAY-PLANE INTERSECTION
+    for (int i = 0; i < 3; i++){
+       float a = uBounds[0][i];
+       float b = uBounds[1][i];
+       float tA = (a-eye[i]) / d[i];
+       float tB = (b-eye[i]) / d[i];
+       float t = max(tA, tB);
+       if(t > closestT) {
+           continue;
+       }
+       if(t < 0.0) {
+           continue;
+       }
+       vec3 intersect = eye + (t-1e-5)*d;
+       if(any(greaterThan(intersect,uBounds[1])) || 
+          any(lessThan(intersect,uBounds[0]))){
+           continue;
+       }
+
+       closestT = t;
+       closestIntersect = intersect;
+       closestNorm = vec3(0,0,0);
+       bool isLowBound = tA > tB;
+       closestNorm[i] = isLowBound ? 1.0 : -1.0;
+       vec3 wallColor;
+       if(i == 0) {
+           wallColor = isLowBound ? vec3(1,0,0) : vec3(0,0.8,0);
+       } else if (i == 2) {
+           wallColor = isLowBound ? vec3(0,0.4,1) : vec3(1,0.6,0);
+       } else {
+           wallColor = isLowBound ? vec3(0.2,0.2,0.2) : vec3(1,1,1);
+       }
+       closestColor = shade(closestIntersect, closestNorm, wallColor, lightLocation);
+       closestReflectance = wallColor * 0.3;
     }
-    minT = t;
- 
-    vec3 intersect = uEyePos + t*d;
-    vec3 norm = intersect - uCenter[i];
-    vec3 color = shade(intersect, norm, vec3(0,1,1), vec3(1,1,-15));
-    gl_FragColor = vec4(color,1);
+
+    // REFLECTION
+    if(closestT == 1e6) {
+        break;
+    }
+    eye = closestIntersect;
+    color += closestColor * bounceColor;
+    bounceColor *= closestReflectance;
+    d -= 2.0 * dot(d, closestNorm) * closestNorm;
   }
+
+  gl_FragColor = vec4(color,1);
 }
 
 </script>
@@ -119,16 +179,20 @@ function initShaderProgram() {
 
     var uPMatrix = gl.getUniformLocation(shaderProgram, "uPMatrix");
     var uMVMatrix = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+    var uFragMatrix = gl.getUniformLocation(shaderProgram, "uFragMatrix");
     var uEyePos = gl.getUniformLocation(shaderProgram, "uEyePos");
     var uCenter = gl.getUniformLocation(shaderProgram, "uCenter");
+    var uBounds = gl.getUniformLocation(shaderProgram, "uBounds");
     var aVertPos = gl.getAttribLocation(shaderProgram, "aVertPos");
     gl.enableVertexAttribArray(aVertPos);
     return {
         "aVertPos": aVertPos,
         "uPMatrix": uPMatrix,
         "uMVMatrix": uMVMatrix,
+        "uFragMatrix": uFragMatrix,
         "uEyePos": uEyePos,
-        "uCenter": uCenter
+        "uCenter": uCenter,
+        "uBounds": uBounds
     };
 }
 
@@ -286,8 +350,19 @@ function physics() {
     }
 }
 
+var rot = 0;
 function renderScene() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    // EYE
+    var eyeRadius = 16;
+    var matFrag = Matrix.RotationY(rot).ensure4x4()
+        .x(Matrix.Translation($V([0,0,eyeRadius-2])));
+    var eyeLoc = Matrix.RotationY(rot).x($V([0,0,eyeRadius]));
+    gl.uniformMatrix4fv(shader.uFragMatrix, false, new Float32Array(matFrag.flatten()));
+    gl.uniform3fv(shader.uEyeLoc, new Float32Array(eyeLoc.flatten()));
+
+    // PROJ, MV MATRIX
     var matProj = makePerspective(45, 640/480, 0.1, 100);
     gl.uniformMatrix4fv(shader.uPMatrix, false, new Float32Array(matProj.flatten()));
 
@@ -297,7 +372,11 @@ function renderScene() {
         .x(Matrix.Translation(loc).ensure4x4());
     gl.uniformMatrix4fv(shader.uMVMatrix, false, new Float32Array(matModelView.flatten()));
 
+    // SCENE
     gl.uniform3fv(shader.uCenter, sphereCenters);
+    var boundsWithoutFront = new Float32Array(bounds);
+    boundsWithoutFront[5] = 1e6;
+    gl.uniform3fv(shader.uBounds, boundsWithoutFront);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, buffers.bVertPos); // point gl.ARRAY_BUFFER to bVertPos
     gl.vertexAttribPointer(shader.aVertPos, 3, gl.FLOAT, false, 0, 0); // point aVertPos to gl.ARRAY_BUFFER
